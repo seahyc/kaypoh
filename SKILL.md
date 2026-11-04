@@ -10,26 +10,31 @@ or needs permission; post yourself only when you have something more specific to
 
 ```sh
 agent-notify post --source claude --key KEY \
-  --title "🙋 Should I push the hotfix to production?" \
+  --title "🙋 Can I push the hotfix to prod rn?" \
   --subtitle "in olympus" \
-  --message "Tests pass on the branch. It touches billing, so I'd like your OK first." \
+  --message "Tests pass on the branch. It touches billing so I want ur OK first, no cap." \
   --iterm-session "$ITERM_SESSION_ID" --urgency urgent \
   --button "go=👀 Review it" --button "🚀 Open MR=https://gitlab.com/…/merge_requests/482" --button snooze
 ```
 
 ## Writing the copy
 
-YC wants it fun but plain: conversational, contextual, simple sentences. Never terse or cryptic.
+Voice: Gen Z internet slang, but still readable at a glance. YC should get the point in one
+look; the slang is flavour, not a riddle. One or two slang touches per notice, never a pile-up.
+(Set `AGENT_NOTIFY_VOICE=plain` for agent-notify's own copy to go plain.)
 
-- **Title**: one full sentence that says who and what, starting with one emoji that fits
-  ("✅ The migration finished and the data checks out", "🙋 I need your OK to delete 3 old buckets").
-  No jargon or puns that need decoding. Under ~60 characters.
-- **Subtitle**: where it happened, usually `in <project>`. Leave the tool name out; the emoji
-  and title already say it.
-- **Message**: the one thing YC needs to know or decide, then what a click does
-  ("Click to jump to its iTerm tab."). One or two sentences, ~200 characters.
+- **Title**: one sentence that says who and what, starting with one emoji that fits.
+  "✅ The migration finished, data checks out fr", "🙋 I need ur OK to delete 3 old buckets",
+  "💀 The deploy flopped on step 4", "🔥 Benchmarks cooked, 2x faster ngl". Under ~45 characters
+  so macOS doesn't cut it off.
+- **Subtitle**: where it happened, usually `in <project>`. Leave the tool name out.
+- **Message**: the one thing YC needs to know or decide, plainly enough to act on
+  ("Tests pass on the branch. It touches billing so I want a yes first."). ~200 characters.
+- Good slang to reach for: fr, ngl, no cap, rn, ur/u, lowkey, bestie, ate, cooked, slay,
+  it's giving, W / L, flopped, 💀, not the vibe, tap in. Avoid anything mean, crude or that
+  hides what actually happened.
 - **Urgency**: `urgent` only when you're blocked on YC (a decision, an approval, a handoff).
-  `normal` for "done, have a look". `low` for FYI (silent, Notification Center only).
+  `normal` for "done, come look". `low` for FYI (silent, Notification Center only).
 
 ## Click and buttons
 
@@ -38,9 +43,9 @@ The click goes to the notice's target: `--iterm-session "$ITERM_SESSION_ID"` (yo
 Add `--activate BUNDLE_ID` to bring an app forward afterwards.
 
 Without `--button`, the notice gets defaults for its kind:
-👉 go (labelled to say where: "👀 Review it", "💬 Open conversation", "🔐 Review request",
-"🧭 Open the tab", "🔍 Show me"), 😴 Remind me in 10 min, and for a waiting Claude in iTerm,
-💬 Reply (YC's text is typed into your pane).
+👉 go (labelled to say where: "👀 Lemme see", "💬 Open the chat", "🔐 Check the request",
+"🧭 Open the tab", "🔍 Show me what broke"), 😴 Remind me in 10, and for a waiting Claude in
+iTerm, 💬 Slide into Claude's replies (YC's text is typed into your pane).
 
 Choose your own with up to 3 `--button` (the first one shows on hover, the rest under Options):
 
@@ -53,8 +58,9 @@ Choose your own with up to 3 `--button` (the first one shows on hover, the rest 
 | `"🔁 Rerun=/abs/path/script arg"` | runs a program by absolute path (space-separated args) |
 | `--no-buttons` | no buttons at all |
 
-Good button labels are 1–4 words starting with an emoji and a verb ("✅ Approve", "📄 Open the
-report", "🔁 Try again"). Offer the choices YC would actually make, best one first.
+Good button labels are 1–4 words starting with an emoji and a verb, slang welcome if it stays
+obvious ("✅ Ship it", "👀 Lemme see", "📄 Open the report", "🔁 Run it back"). Offer the choices
+YC would actually make, best one first.
 
 ## Kinds, keys and housekeeping
 

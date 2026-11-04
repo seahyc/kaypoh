@@ -50,7 +50,8 @@ sound, and a title that starts with its tool's emoji (🧡 Claude Code, 🤖 Cod
 The hooks and `run` pick a random title from a few lines per kind ("👋 Claude finished and it's your turn",
 "🎉 Codex wrapped up, over to you") in plain words, put the project in the subtitle ("in olympus"),
 and end the body with what a click does.
-Low-urgency notices are silent.
+Low-urgency notices are silent. The voice is Gen Z internet slang ("🎉 Codex ate that turn",
+"💥 Nightly backup flopped 💀"); `AGENT_NOTIFY_VOICE=plain` switches agent-notify's own copy to plain.
 
 ## Buttons
 

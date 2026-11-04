@@ -48,14 +48,25 @@ func validItermSession(_ id: String) -> Bool {
 
 // Every kind of notice has its own badge (drawn by badges.swift), its own system sound and a
 // handful of title lines, picked at random so the same event doesn't read the same way twice.
+// The voice: Gen Z internet slang by default (still readable at a glance), or plain with
+// AGENT_NOTIFY_VOICE=plain. `say(slang, plain)` picks.
+let plainVoice = ProcessInfo.processInfo.environment["AGENT_NOTIFY_VOICE"] == "plain"
+func say<T>(_ slang: T, _ plain: T) -> T { plainVoice ? plain : slang }
+
 struct Kind { let sound: String?; let titles: [String] }
 let kinds: [String: Kind] = [
-    "claude-waiting":    Kind(sound: "Pop", titles: ["👋 Claude is waiting for you{p}", "👋 Claude finished{p} and it's your turn",
-                                                     "☕️ Claude is ready for you{p}"]),
-    "claude-permission": Kind(sound: "Hero", titles: ["🙋 Claude needs your OK to continue{p}", "🙋 Claude is asking permission{p}",
-                                                      "✋ Claude is paused for your OK{p}"]),
-    "codex-done":        Kind(sound: "Glass", titles: ["🎉 Codex finished its turn{p}", "✅ Codex is done, your turn{p}",
-                                                       "🎉 Codex wrapped up{p}, over to you"]),
+    "claude-waiting":    Kind(sound: "Pop", titles: say(
+        ["👋 Claude's done, ur turn bestie", "👀 Claude is waiting on u fr", "☕️ Claude finished, ball's in ur court ngl",
+         "🫵 ur move, Claude is just sitting there"],
+        ["👋 Claude is waiting for you", "👋 Claude finished and it's your turn", "☕️ Claude is ready for you"])),
+    "claude-permission": Kind(sound: "Hero", titles: say(
+        ["🙋 Claude needs ur OK, no cap", "🙏 Claude won't move without ur blessing", "✋ Claude is asking permission rn",
+         "🥺 Claude needs a yes from u fr"],
+        ["🙋 Claude needs your OK to continue", "🙋 Claude is asking permission", "✋ Claude is paused for your OK"])),
+    "codex-done":        Kind(sound: "Glass", titles: say(
+        ["🎉 Codex ate that turn", "💅 Codex is done, it's giving shipped", "✅ Codex finished, ur move bestie",
+         "🔥 Codex cooked, come look"],
+        ["🎉 Codex finished its turn", "✅ Codex is done, your turn", "🎉 Codex wrapped up, over to you"])),
     "browser-handoff":   Kind(sound: "Submarine", titles: []),
     "browser-signin":    Kind(sound: "Submarine", titles: []),
     "browser-debug":     Kind(sound: "Submarine", titles: []),
@@ -85,7 +96,8 @@ func inferKind(_ n: Notice) -> String {
     case "agent-vault": return "vault-approval"
     default:
         if t.contains("failed") { return "run-failed" }
-        if t.contains("finished") || t.contains("landed") { return "run-ok" }
+        if t.contains("flopped") || t.contains("took an l") { return "run-failed" }
+        if t.contains("finished") || t.contains("slay") || t.contains("took the w") { return "run-ok" }
         return "bell"
     }
 }
@@ -290,7 +302,8 @@ func badgeAttachment(_ kind: String) -> [UNNotificationAttachment] {
 //   --button "🔁 Rerun=/abs/script arg"      a labelled program (absolute path, space-separated args)
 // macOS shows the first button on hover and the rest under Options.
 
-let presetLabels = ["go": "👉 Take me there", "snooze": "😴 Remind me in 10 min", "reply": "💬 Reply"]
+let presetLabels = say(["go": "👉 Take me there", "snooze": "😴 Remind me in 10", "reply": "💬 Reply"],
+                       ["go": "👉 Take me there", "snooze": "😴 Remind me in 10 min", "reply": "💬 Reply"])
 
 func parseButton(_ spec: String) -> [String: Any] {
     let parts = spec.split(separator: "=", maxSplits: 1).map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -313,15 +326,15 @@ func defaultButtons(_ n: Notice, kind: String) -> [[String: Any]] {
     let opensCodex = (n.action["open"] as? String)?.hasPrefix("codex:") ?? false
     let go: String
     switch kind {
-    case "claude-permission": go = "👀 Review it"
-    case "codex-done": go = opensCodex ? "💬 Open conversation" : "👉 Take me there"
+    case "claude-permission": go = say("👀 Lemme see", "👀 Review it")
+    case "codex-done": go = opensCodex ? say("💬 Open the chat", "💬 Open conversation") : "👉 Take me there"
     case "browser-handoff", "browser-signin", "browser-debug": go = "🧭 Open the tab"
-    case "vault-approval": go = "🔐 Review request"
-    case "run-failed": go = "🔍 Show me"
+    case "vault-approval": go = say("🔐 Check the request", "🔐 Review request")
+    case "run-failed": go = say("🔍 Show me what broke", "🔍 Show me")
     default: go = "👉 Take me there"
     }
     var list: [[String: Any]] = []
-    if kind == "claude-waiting" && n.action["iterm"] != nil { list.append(["type": "reply", "label": "💬 Reply to Claude"]) }
+    if kind == "claude-waiting" && n.action["iterm"] != nil { list.append(["type": "reply", "label": say("💬 Slide into Claude's replies", "💬 Reply to Claude")]) }
     list.append(["type": "go", "label": go])
     list.append(["type": "snooze", "label": presetLabels["snooze"]!])
     return list
@@ -417,8 +430,8 @@ func post(_ n: Notice, done: @escaping (Int32) -> Void) {
         switch decision {
         case .skip: return
         case .fold(let count):
-            let summary = Notice(source: n.source, title: "📚 \(count) more from \(n.display) while you were away",
-                                 message: "The latest one: \(n.title). \(n.message)", key: "__more", urgency: "low", kind: "pile",
+            let summary = Notice(source: n.source, title: say("📚 \(count) more from \(n.display), u were busy fr", "📚 \(count) more from \(n.display) while you were away"),
+                                 message: say("Latest drop: \(n.title). \(n.message)", "The latest one: \(n.title). \(n.message)"), key: "__more", urgency: "low", kind: "pile",
                                  action: n.action)
             request = UNNotificationRequest(identifier: "\(n.source):__more", content: content(for: summary), trigger: nil)
             outcome = "folded"
@@ -601,8 +614,9 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
         n.title = pickTitle(n.kind!, project: nil, "Claude is waiting for you")
         n.subtitle = project.isEmpty ? nil : "in \(project)"
         n.urgency = permission ? "urgent" : "normal"
-        let hint = n.action["iterm"] == nil ? "Click to switch to it."
-            : permission ? "Click to jump to its iTerm tab and decide." : "Click to jump to its iTerm tab, or reply right here."
+        let hint = n.action["iterm"] == nil ? say("Tap in to switch to it.", "Click to switch to it.")
+            : permission ? say("Tap in to jump to its iTerm tab and decide.", "Click to jump to its iTerm tab and decide.")
+            : say("Tap in to jump to its iTerm tab, or reply right here.", "Click to jump to its iTerm tab, or reply right here.")
         // Quote what Claude actually last said, not Claude Code's generic "waiting for your input".
         if !permission, let said = (json["transcript_path"] as? String).flatMap(lastClaudeText) {
             n.message = "“\(said)”"   // the quote speaks for itself; the buttons say where a click goes
@@ -661,9 +675,10 @@ func runCommand(_ args: [String]) -> (Notice, Int32) {
     let what = n.title
     n.key = n.key ?? "run-\(what)"
     n.kind = code == 0 ? "run-ok" : "run-failed"
-    n.title = code == 0 ? "🚀 \(what) finished" : "💥 \(what) failed"
-    n.message = code == 0 ? "All good. It took \(took) and exited cleanly. 😎"
-                          : "It stopped with exit code \(code) after \(took). Click to see the output in your terminal. 🔍"
+    n.title = code == 0 ? say("🚀 \(what) finished, slay", "🚀 \(what) finished") : say("💥 \(what) flopped 💀", "💥 \(what) failed")
+    n.message = code == 0 ? say("Took \(took), clean exit. Big W 😎", "All good. It took \(took) and exited cleanly. 😎")
+                          : say("Exit code \(code) after \(took). Not the vibe 😬 Click to see what broke 🔍",
+                                "It stopped with exit code \(code) after \(took). Click to see the output in your terminal. 🔍")
     if code != 0 { n.sound = true }
     if n.action["activate"] == nil, let bundle = terminalBundle(ProcessInfo.processInfo.environment) { n.action["activate"] = bundle }
     return (n, code)
@@ -794,7 +809,7 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
         case "snooze":
             // Hand it back to macOS with a 10-minute timer; it comes back even though this app exits.
             let c = request.content.mutableCopy() as! UNMutableNotificationContent
-            if !c.title.hasPrefix("⏰") { c.title = "⏰ Reminder: " + c.title }
+            if !c.title.hasPrefix("⏰") { c.title = say("⏰ Back again: ", "⏰ Reminder: ") + c.title }
             c.attachments = badgeAttachment(request.content.userInfo["kind"] as? String ?? "bell")
             let again = UNNotificationRequest(identifier: id, content: c,
                                               trigger: UNTimeIntervalNotificationTrigger(timeInterval: 600, repeats: false))
