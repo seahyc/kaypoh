@@ -51,10 +51,10 @@ func validItermSession(_ id: String) -> Bool {
 struct Kind { let sound: String?; let titles: [String] }
 let kinds: [String: Kind] = [
     "claude-waiting":    Kind(sound: "Pop", titles: ["👋 Claude is waiting for you{p}", "👋 Claude finished{p} and it's your turn",
-                                                     "☕️ Claude is ready for your next message{p}"]),
+                                                     "☕️ Claude is ready for you{p}"]),
     "claude-permission": Kind(sound: "Hero", titles: ["🙋 Claude needs your OK to continue{p}", "🙋 Claude is asking permission{p}",
-                                                      "✋ Claude is paused{p} until you approve something"]),
-    "codex-done":        Kind(sound: "Glass", titles: ["🎉 Codex finished its turn{p}", "✅ Codex is done{p} and waiting for you",
+                                                      "✋ Claude is paused for your OK{p}"]),
+    "codex-done":        Kind(sound: "Glass", titles: ["🎉 Codex finished its turn{p}", "✅ Codex is done, your turn{p}",
                                                        "🎉 Codex wrapped up{p}, over to you"]),
     "browser-handoff":   Kind(sound: "Submarine", titles: []),
     "browser-signin":    Kind(sound: "Submarine", titles: []),
@@ -605,7 +605,7 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
             : permission ? "Click to jump to its iTerm tab and decide." : "Click to jump to its iTerm tab, or reply right here."
         // Quote what Claude actually last said, not Claude Code's generic "waiting for your input".
         if !permission, let said = (json["transcript_path"] as? String).flatMap(lastClaudeText) {
-            n.message = "It said: “\(said)” \(hint)"
+            n.message = "“\(said)”"   // the quote speaks for itself; the buttons say where a click goes
         } else {
             n.message = "\(message.hasSuffix(".") ? message : message + ".") \(hint)"
         }
@@ -624,12 +624,12 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
            inApp || n.action["iterm"] == nil {
             n.action = ["open": "codex://threads/\(thread)", "activate": "com.openai.codex"]
         }
-        n.message += n.action["open"] != nil ? " Click to open the conversation in Codex." : " Click to jump to its iTerm tab."
+        // (no click hint after the quote: the buttons say where it goes)
         n.kind = "codex-done"
         n.title = pickTitle("codex-done", project: nil, "Codex finished its turn")
         n.subtitle = project.map { "in \($0)" }
         let said = last.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
-        n.message = "It said: “\(said.count > 220 ? said.prefix(220) + "…" : Substring(said))”"
+        n.message = "“\(said.count > 220 ? said.prefix(220) + "…" : Substring(said))”"
     default: fail("hook takes claude or codex")
     }
     n.message = String(n.message.prefix(400))
