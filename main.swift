@@ -2,7 +2,7 @@
 //
 //   agent-notify post  --source TOOL --title "what happened" --message TEXT
 //                      [--key KEY] [--urgency low|normal|urgent] [--sound]
-//                      [--open https://... | --run /abs/exe args...] [--activate BUNDLE_ID]
+//                      [--if-new] [--open https://... | --run /abs/exe args...] [--activate BUNDLE_ID]
 //   agent-notify clear --source TOOL --key KEY          withdraw a notice once it is resolved
 //   agent-notify run   --source TOOL --title WHAT -- /cmd args...   run it, then report the result
 //   agent-notify hook  claude|codex                      harness hooks (JSON on stdin / last arg)
@@ -46,6 +46,7 @@ struct Notice {
     var key: String?
     var urgency = "normal"
     var sound = false
+    var ifNew = false
     var action: [String: Any] = [:]
     var identifier: String { "\(source):\(key ?? UUID().uuidString)" }
     var display: String { displayNames[source] ?? source }
@@ -73,6 +74,7 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
             n.urgency = value()
             guard ["low", "normal", "urgent"].contains(n.urgency) else { fail("--urgency is low, normal or urgent") }
         case "--sound": n.sound = true
+        case "--if-new": n.ifNew = true
         case "--activate": n.action["activate"] = value()
         case "--open":
             let url = value()
@@ -149,7 +151,7 @@ func record(_ entry: [String: Any]) {
     }
 }
 
-enum Decision { case show, replace, fold(Int) }
+enum Decision { case show, replace, fold(Int), skip }
 
 func decide(_ n: Notice) -> Decision {
     let now = Date().timeIntervalSince1970
@@ -159,6 +161,7 @@ func decide(_ n: Notice) -> Decision {
         if state.sent[n.source]!.isEmpty { state.folded[n.source] = 0 }
         let id = n.key.map { "\(n.source):\($0)" }
         if let id = id, state.active[id] != nil {
+            if n.ifNew { return .skip }   // already showing: don't alert again
             state.active[id] = now
             return .replace   // the same event again: replace, don't count
         }
@@ -202,7 +205,13 @@ func post(_ n: Notice, done: @escaping (Int32) -> Void) {
         let decision = decide(n)
         var request: UNNotificationRequest
         var outcome: String
+        if case .skip = decision {
+            print("skipped")
+            done(0)
+            return
+        }
         switch decision {
+        case .skip: return
         case .fold(let count):
             let summary = Notice(source: n.source, title: "\(count) more notice\(count == 1 ? "" : "s")",
                                  message: "Latest: \(n.title). \(n.message)", key: "__more", urgency: "low")
