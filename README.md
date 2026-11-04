@@ -2,7 +2,7 @@
 
 One notification layer for every agent tool on this Mac: one look, one interface, no spam.
 A tiny ad-hoc-signed app (`~/.local/libexec/agent-notify/Agent Notify.app`, bundle id
-`local.agents.notify`) posts through macOS Notification Center. `agent-notify` is on PATH.
+`com.seahyc.agent-notify`) posts through macOS Notification Center. `agent-notify` is on PATH.
 
 ## Use it from any tool
 

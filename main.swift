@@ -567,7 +567,7 @@ func status(openSettings: Bool) {
             print("To keep notices on screen: System Settings > Notifications > Agent Notify > set style to Persistent (Alerts).")
         }
         if openSettings {
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=local.agents.notify")!)
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=com.seahyc.agent-notify")!)
         }
         exit(s.alertStyle == .alert ? 0 : 1)
     }
