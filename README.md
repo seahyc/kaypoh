@@ -47,17 +47,19 @@ sound, and a title that starts with its tool's emoji (🧡 Claude Code, 🤖 Cod
 | `pile` | 📚 purple | none | the "N more piling up" summary |
 | `bell` | 🔔 indigo | Tink | anything else |
 
-The hooks and `run` pick a random title from a few lines per kind ("Ball's in your court 🎾👀",
-"Mic drop 🎤⬇️", "Deploy went kaboom 🧨"), and put the project in the subtitle (📁 name).
+The hooks and `run` pick a random title from a few lines per kind ("👋 Claude finished and it's your turn",
+"🎉 Codex wrapped up, over to you") in plain words, put the project in the subtitle ("in olympus"),
+and end the body with what a click does.
 Low-urgency notices are silent.
 
 ## Click and actions
 
-- **Click / 🏃 Jump in**: go to where it came from. A Claude Code or Codex CLI session in iTerm2
+- **Click / 👉 Take me there**: go to where it came from. A Claude Code or Codex CLI session in iTerm2
   focuses its exact window, tab and split pane. A Codex app turn opens that thread
   (`codex://threads/<id>`). browserctrl focuses the tab; agent-vault opens the approval page.
 - **💬 Reply** (Claude Code waiting, in iTerm2): types your text into that pane and presses Return.
-- **😴 Snooze 10 min**: macOS brings the notice back in 10 minutes, marked ⏰.
+- **😴 Remind me in 10 min**: macOS brings the notice back in 10 minutes, marked ⏰.
+  Plain notices with nowhere to go have no buttons, so nothing covers their text on hover.
 
 The first iTerm2 focus or reply asks once whether Agent Notify may control iTerm2.
 
@@ -70,6 +72,11 @@ the current style; `--open-settings` opens the pane to switch it to Persistent.
 
 Urgent notices can't be time-sensitive (break through Focus): that entitlement needs a
 provisioning profile, and macOS kills an ad-hoc-signed app that claims it.
+
+Notices remove themselves after 5 minutes (re-posting the same key restarts the clock).
+`--expire SECONDS` changes it per notice, `AGENT_NOTIFY_EXPIRE` for everything, `0` = never.
+They are grouped per session, thread or event, not per tool, so they don't pile into one stack
+(the first click on a stack only expands it).
 
 ## Design and anti-spam
 

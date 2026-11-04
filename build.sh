@@ -9,13 +9,28 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/Agent Notify.app/Contents/MacOS"
 swiftc -O "$src/main.swift" -o "$tmp/Agent Notify.app/Contents/MacOS/agent-notify" -framework Cocoa -framework UserNotifications
 # Icon: draw at 1024 px, then every size macOS asks for.
-mkdir -p "$tmp/Agent Notify.app/Contents/Resources" "$tmp/AppIcon.iconset"
+mkdir -p "$tmp/Agent Notify.app/Contents/Resources" "$tmp/AgentNotifyIcon.iconset"
 swift "$src/icon.swift" "$tmp/icon.png" >/dev/null
 for s in 16 32 128 256 512; do
-  sips -z $s $s "$tmp/icon.png" --out "$tmp/AppIcon.iconset/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s * 2)) $((s * 2)) "$tmp/icon.png" --out "$tmp/AppIcon.iconset/icon_${s}x${s}@2x.png" >/dev/null
+  sips -z $s $s "$tmp/icon.png" --out "$tmp/AgentNotifyIcon.iconset/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) "$tmp/icon.png" --out "$tmp/AgentNotifyIcon.iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
-iconutil -c icns "$tmp/AppIcon.iconset" -o "$tmp/Agent Notify.app/Contents/Resources/AppIcon.icns"
+iconutil -c icns "$tmp/AgentNotifyIcon.iconset" -o "$tmp/Agent Notify.app/Contents/Resources/AgentNotifyIcon.icns"
+# Newer macOS reads the icon from a compiled asset catalog (Assets.car); the .icns is the fallback.
+set_dir="$tmp/Assets.xcassets/AgentNotifyIcon.appiconset"
+mkdir -p "$set_dir"
+images=""
+for s in 16 32 128 256 512; do
+  for scale in 1 2; do
+    px=$((s * scale))
+    sips -z $px $px "$tmp/icon.png" --out "$set_dir/icon_${s}@${scale}x.png" >/dev/null
+    images="$images{\"idiom\":\"mac\",\"size\":\"${s}x${s}\",\"scale\":\"${scale}x\",\"filename\":\"icon_${s}@${scale}x.png\"},"
+  done
+done
+printf '{"images":[%s],"info":{"version":1,"author":"xcode"}}' "${images%,}" > "$set_dir/Contents.json"
+printf '{"info":{"version":1,"author":"xcode"}}' > "$tmp/Assets.xcassets/Contents.json"
+xcrun actool "$tmp/Assets.xcassets" --compile "$tmp/Agent Notify.app/Contents/Resources" --platform macosx \
+  --minimum-deployment-target 13.0 --app-icon AgentNotifyIcon --output-partial-info-plist "$tmp/assets.plist" >/dev/null
 # One emoji badge per kind of notice, and the system sounds the kinds use.
 swift "$src/badges.swift" "$tmp/Agent Notify.app/Contents/Resources/badges" >/dev/null
 for snd in Pop Hero Glass Submarine Purr Ping Basso Tink; do
@@ -29,10 +44,11 @@ cat > "$tmp/Agent Notify.app/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Agent Notify</string>
   <key>CFBundleDisplayName</key><string>Agent Notify</string>
   <key>CFBundleExecutable</key><string>agent-notify</string>
-  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundleIconFile</key><string>AgentNotifyIcon</string>
+  <key>CFBundleIconName</key><string>AgentNotifyIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleVersion</key><string>4</string>
-  <key>CFBundleShortVersionString</key><string>4.0</string>
+  <key>CFBundleVersion</key><string>5</string>
+  <key>CFBundleShortVersionString</key><string>5.0</string>
   <key>LSUIElement</key><true/>
   <key>NSUserNotificationAlertStyle</key><string>alert</string>
   <key>NSAppleEventsUsageDescription</key><string>Clicking a notice brings the iTerm2 tab and pane it came from to the front.</string>

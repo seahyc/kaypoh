@@ -7,6 +7,7 @@
 //   agent-notify run   --source TOOL --title WHAT -- /cmd args...   run it, then report the result
 //   agent-notify hook  claude|codex                      harness hooks (JSON on stdin / last arg)
 //   agent-notify list  [--json]                          recent history
+//   (post takes --expire SECONDS: notices remove themselves after 5 min by default; 0 = never)
 //   agent-notify status [--open-settings]                permission and banner style (persistent?)
 //
 // One design: every notice is titled "<Tool> · <what happened>", grouped per tool, with at most
@@ -25,6 +26,9 @@ import Cocoa
 import UserNotifications
 
 let window: TimeInterval = 600
+// Notices stay on screen (persistent alerts) but tidy themselves away after this long.
+// --expire SECONDS per notice, AGENT_NOTIFY_EXPIRE for everything; 0 keeps them until dismissed.
+let defaultExpire = TimeInterval(ProcessInfo.processInfo.environment["AGENT_NOTIFY_EXPIRE"] ?? "") ?? 300
 let perWindow = 3
 let stateDir = (NSHomeDirectory() as NSString).appendingPathComponent(".local/state/agent-notify")
 let displayNames = ["claude": "Claude Code", "codex": "Codex", "agent-vault": "agent-vault",
@@ -103,6 +107,7 @@ struct Notice {
     var ifNew = false
     var kind: String?
     var subtitle: String?
+    var expire: TimeInterval = defaultExpire
     var action: [String: Any] = [:]
     var identifier: String { "\(source):\(key ?? UUID().uuidString)" }
     var display: String { displayNames[source] ?? source }
@@ -134,6 +139,9 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
             n.urgency = value()
             guard ["low", "normal", "urgent"].contains(n.urgency) else { fail("--urgency is low, normal or urgent") }
         case "--sound": n.sound = true
+        case "--expire":
+            guard let secs = TimeInterval(value()), secs >= 0 else { fail("--expire takes seconds (0 = never)") }
+            n.expire = secs
         case "--if-new": n.ifNew = true
         case "--activate": n.action["activate"] = value()
         case "--iterm-session":
@@ -175,9 +183,18 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
 // MARK: - State (anti-spam) and history, under one file lock
 
 struct State: Codable {
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sent = try c.decodeIfPresent([String: [Double]].self, forKey: .sent) ?? [:]
+        folded = try c.decodeIfPresent([String: Int].self, forKey: .folded) ?? [:]
+        active = try c.decodeIfPresent([String: Double].self, forKey: .active) ?? [:]
+        expiry = try c.decodeIfPresent([String: String].self, forKey: .expiry) ?? [:]
+    }
     var sent: [String: [Double]] = [:]      // source -> times of counted notices in the window
     var folded: [String: Int] = [:]         // source -> notices folded into "N more"
     var active: [String: Double] = [:]      // identifier -> time posted (for replace-not-count)
+    var expiry: [String: String] = [:]      // identifier -> stamp of the timer allowed to remove it
 }
 
 func withState<T>(_ body: (inout State) -> T) -> T {
@@ -262,9 +279,11 @@ func content(for n: Notice) -> UNMutableNotificationContent {
     let c = UNMutableNotificationContent()
     let startsWithEmoji = n.title.unicodeScalars.first.map { $0.properties.isEmojiPresentation || $0.properties.isEmoji && $0.value > 0xFF } ?? false
     c.title = startsWithEmoji ? n.title : "\(sourceEmoji[n.source] ?? "✨") \(n.title)"
-    c.subtitle = [n.display, n.subtitle].compactMap { $0 }.joined(separator: " · ")
+    if let subtitle = n.subtitle { c.subtitle = subtitle }   // real context only (the project); the emoji says which tool
     c.body = n.message
-    c.threadIdentifier = n.source
+    // One group per session/thread/event, not per tool: macOS stacks a group, and the first click
+    // on a stack only expands it, so per-tool groups made clicks look like they did nothing.
+    c.threadIdentifier = n.key.map { "\(n.source):\($0)" } ?? n.source
     var info = n.action
     info["kind"] = kind
     c.userInfo = info
@@ -298,7 +317,8 @@ func post(_ n: Notice, done: @escaping (Int32) -> Void) {
         case .skip: return
         case .fold(let count):
             let summary = Notice(source: n.source, title: "📚 \(count) more from \(n.display) while you were away",
-                                 message: "The latest one: \(n.title). \(n.message)", key: "__more", urgency: "low", kind: "pile")
+                                 message: "The latest one: \(n.title). \(n.message)", key: "__more", urgency: "low", kind: "pile",
+                                 action: n.action)
             request = UNNotificationRequest(identifier: "\(n.source):__more", content: content(for: summary), trigger: nil)
             outcome = "folded"
         case .replace:
@@ -312,9 +332,40 @@ func post(_ n: Notice, done: @escaping (Int32) -> Void) {
             if let error = error { fail("\(error)", 4) }
             record(["source": n.source, "key": n.key ?? "", "title": n.title, "urgency": n.urgency, "outcome": outcome,
                     "action": n.action])
+            if n.expire > 0 { scheduleExpiry(request.identifier, after: n.expire) }
             print(outcome)
             done(0)
         }
+    }
+}
+
+// A small detached helper waits, then removes the notice, unless it was re-posted meanwhile
+// (a newer post of the same key gets its own timer).
+func scheduleExpiry(_ id: String, after seconds: TimeInterval) {
+    let stamp = String(Date().timeIntervalSince1970)
+    _ = withState { state in state.expiry[id] = stamp }
+    guard let exe = Bundle.main.executableURL else { return }
+    let p = Process()
+    p.executableURL = exe
+    p.arguments = ["expire", id, stamp, String(seconds)]
+    p.standardOutput = FileHandle.nullDevice
+    p.standardError = FileHandle.nullDevice
+    try? p.run()
+}
+
+func expire(_ id: String, stamp: String, after seconds: TimeInterval) {
+    DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
+        let current = withState { state -> Bool in
+            guard state.expiry[id] == stamp else { return false }
+            state.expiry.removeValue(forKey: id)
+            state.active.removeValue(forKey: id)
+            return true
+        }
+        guard current else { exit(0) }
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [id])
+        record(["source": String(id.split(separator: ":").first ?? ""),
+                "key": String(id.split(separator: ":", maxSplits: 1).last ?? ""), "outcome": "expired"])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
     }
 }
 
@@ -424,7 +475,8 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
         n.key = (json["session_id"] as? String).map { "session-\($0)" }
         let permission = message.lowercased().contains("permission")
         n.kind = permission ? "claude-permission" : "claude-waiting"
-        n.title = pickTitle(n.kind!, project: project.isEmpty ? nil : project, "Claude is waiting for you")
+        n.title = pickTitle(n.kind!, project: nil, "Claude is waiting for you")
+        n.subtitle = project.isEmpty ? nil : "in \(project)"
         n.urgency = permission ? "urgent" : "normal"
         let hint = n.action["iterm"] == nil ? "Click to switch to it."
             : permission ? "Click to jump to its iTerm tab and decide." : "Click to jump to its iTerm tab, or reply right here."
@@ -446,7 +498,8 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
         }
         n.message += n.action["open"] != nil ? " Click to open the conversation in Codex." : " Click to jump to its iTerm tab."
         n.kind = "codex-done"
-        n.title = pickTitle("codex-done", project: project, "Codex finished its turn")
+        n.title = pickTitle("codex-done", project: nil, "Codex finished its turn")
+        n.subtitle = project.map { "in \($0)" }
         let said = last.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
         n.message = "It said: “\(said.count > 220 ? said.prefix(220) + "…" : Substring(said))”"
     default: fail("hook takes claude or codex")
@@ -522,10 +575,17 @@ func status(openSettings: Bool) {
 
 // MARK: - App
 
+// A click relaunches the app with no arguments; only then does handling it end the process.
+var launchedForClick = false
+
 final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    // The click that launched the app is delivered right at launch: listen before it finishes.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = self
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let center = UNUserNotificationCenter.current()
-        center.delegate = self
         let icon = { (name: String) in UNNotificationActionIcon(systemImageName: name) }
         let open = UNNotificationAction(identifier: "open", title: "👉 Take me there", options: [.foreground], icon: icon("arrow.up.forward.app"))
         let snooze = UNNotificationAction(identifier: "snooze", title: "😴 Remind me in 10 min", options: [], icon: icon("moon.zzz"))
@@ -534,12 +594,13 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
         center.setNotificationCategories([
             UNNotificationCategory(identifier: "actionable", actions: [open, snooze], intentIdentifiers: []),
             UNNotificationCategory(identifier: "reply", actions: [reply, open, snooze], intentIdentifiers: []),
-            UNNotificationCategory(identifier: "notice", actions: [snooze], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "notice", actions: [], intentIdentifiers: []),
         ])
         var args = Array(CommandLine.arguments.dropFirst())
         let finish: (Int32) -> Void = { code in exit(code) }
         guard let command = args.first else {
             // Relaunched by a click: the response arrives through the delegate.
+            launchedForClick = true
             DispatchQueue.main.asyncAfter(deadline: .now() + 15) { exit(0) }
             return
         }
@@ -563,6 +624,9 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
         case "list":
             list(json: args.contains("--json"))
             exit(0)
+        case "expire":
+            guard args.count == 4, let secs = TimeInterval(args[3]) else { exit(2) }
+            expire(args[1], stamp: args[2], after: secs)
         case "status":
             status(openSettings: args.contains("--open-settings"))
         case "--help", "-h", "help":
@@ -595,7 +659,7 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
             let again = UNNotificationRequest(identifier: id, content: c,
                                               trigger: UNTimeIntervalNotificationTrigger(timeInterval: 600, repeats: false))
             entry("snoozed")
-            center.add(again) { _ in done(); exit(0) }
+            center.add(again) { _ in done(); if launchedForClick { exit(0) } }
             return
         case "reply":
             if let text = (response as? UNTextInputNotificationResponse)?.userText,
@@ -607,7 +671,7 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
         default: break
         }
         done()
-        exit(0)
+        if launchedForClick { exit(0) }
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
