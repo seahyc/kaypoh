@@ -16,6 +16,11 @@ for s in 16 32 128 256 512; do
   sips -z $((s * 2)) $((s * 2)) "$tmp/icon.png" --out "$tmp/AppIcon.iconset/icon_${s}x${s}@2x.png" >/dev/null
 done
 iconutil -c icns "$tmp/AppIcon.iconset" -o "$tmp/Agent Notify.app/Contents/Resources/AppIcon.icns"
+# One emoji badge per kind of notice, and the system sounds the kinds use.
+swift "$src/badges.swift" "$tmp/Agent Notify.app/Contents/Resources/badges" >/dev/null
+for snd in Pop Hero Glass Submarine Purr Ping Basso Tink; do
+  cp "/System/Library/Sounds/$snd.aiff" "$tmp/Agent Notify.app/Contents/Resources/"
+done
 cat > "$tmp/Agent Notify.app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -26,9 +31,11 @@ cat > "$tmp/Agent Notify.app/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>agent-notify</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleVersion</key><string>2</string>
-  <key>CFBundleShortVersionString</key><string>2.0</string>
+  <key>CFBundleVersion</key><string>4</string>
+  <key>CFBundleShortVersionString</key><string>4.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSUserNotificationAlertStyle</key><string>alert</string>
+  <key>NSAppleEventsUsageDescription</key><string>Clicking a notice brings the iTerm2 tab and pane it came from to the front.</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
 </dict></plist>
 PLIST

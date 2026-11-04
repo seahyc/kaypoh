@@ -7,6 +7,7 @@
 //   agent-notify run   --source TOOL --title WHAT -- /cmd args...   run it, then report the result
 //   agent-notify hook  claude|codex                      harness hooks (JSON on stdin / last arg)
 //   agent-notify list  [--json]                          recent history
+//   agent-notify status [--open-settings]                permission and banner style (persistent?)
 //
 // One design: every notice is titled "<Tool> · <what happened>", grouped per tool, with at most
 // one action (open an http(s) URL, or run one program by absolute path, then optionally bring an
@@ -32,6 +33,59 @@ let terminalBundles = ["iTerm.app": "com.googlecode.iterm2", "Apple_Terminal": "
                        "WarpTerminal": "dev.warp.Warp-Stable", "ghostty": "com.mitchellh.ghostty",
                        "vscode": "com.microsoft.VSCode"]
 
+// Schemes a click may open: web pages, and the Codex app's thread links (codex://threads/<id>).
+let openSchemes: Set<String> = ["https", "http", "codex"]
+
+// ITERM_SESSION_ID looks like "w0t4p0:9053558D-36ED-4F77-94C8-AD5C6AB3BEC7"; AppleScript knows the UUID.
+func itermSessionUUID(_ id: String) -> String { String(id.split(separator: ":").last ?? "") }
+func validItermSession(_ id: String) -> Bool {
+    itermSessionUUID(id).range(of: "^[0-9A-Fa-f-]{36}$", options: .regularExpression) != nil
+}
+
+// Every kind of notice has its own badge (drawn by badges.swift), its own system sound and a
+// handful of title lines, picked at random so the same event doesn't read the same way twice.
+struct Kind { let sound: String?; let titles: [String] }
+let kinds: [String: Kind] = [
+    "claude-waiting":    Kind(sound: "Pop", titles: ["👋 Claude is waiting for you{p}", "👋 Claude finished{p} and it's your turn",
+                                                     "☕️ Claude is ready for your next message{p}"]),
+    "claude-permission": Kind(sound: "Hero", titles: ["🙋 Claude needs your OK to continue{p}", "🙋 Claude is asking permission{p}",
+                                                      "✋ Claude is paused{p} until you approve something"]),
+    "codex-done":        Kind(sound: "Glass", titles: ["🎉 Codex finished its turn{p}", "✅ Codex is done{p} and waiting for you",
+                                                       "🎉 Codex wrapped up{p}, over to you"]),
+    "browser-handoff":   Kind(sound: "Submarine", titles: []),
+    "browser-signin":    Kind(sound: "Submarine", titles: []),
+    "browser-debug":     Kind(sound: "Submarine", titles: []),
+    "vault-approval":    Kind(sound: "Purr", titles: []),
+    "run-ok":            Kind(sound: "Ping", titles: []),
+    "run-failed":        Kind(sound: "Basso", titles: []),
+    "pile":              Kind(sound: nil, titles: []),
+    "bell":              Kind(sound: "Tink", titles: []),
+]
+let sourceEmoji = ["claude": "🧡", "codex": "🤖", "browserctrl": "🌐", "agent-vault": "🗝️", "scripts": "⚙️"]
+
+func pickTitle(_ kind: String, project: String?, _ fallback: String) -> String {
+    let template = kinds[kind]?.titles.randomElement() ?? fallback
+    return template.replacingOccurrences(of: "{p}", with: project.map { " in \($0)" } ?? "")
+}
+
+// The kind of a notice, when its sender didn't say: guessed from the tool and the title.
+func inferKind(_ n: Notice) -> String {
+    let t = n.title.lowercased()
+    switch n.source {
+    case "claude": return t.contains("permission") || n.urgency == "urgent" ? "claude-permission" : "claude-waiting"
+    case "codex": return "codex-done"
+    case "browserctrl":
+        if t.contains("debugging") || t.contains("allow") { return "browser-debug" }
+        if t.contains("sign") || t.contains("log in") || t.contains("login") { return "browser-signin" }
+        return "browser-handoff"
+    case "agent-vault": return "vault-approval"
+    default:
+        if t.contains("failed") { return "run-failed" }
+        if t.contains("finished") || t.contains("landed") { return "run-ok" }
+        return "bell"
+    }
+}
+
 func fail(_ message: String, _ code: Int32 = 2) -> Never {
     FileHandle.standardError.write(("agent-notify: " + message + "\n").data(using: .utf8)!)
     exit(code)
@@ -47,6 +101,8 @@ struct Notice {
     var urgency = "normal"
     var sound = false
     var ifNew = false
+    var kind: String?
+    var subtitle: String?
     var action: [String: Any] = [:]
     var identifier: String { "\(source):\(key ?? UUID().uuidString)" }
     var display: String { displayNames[source] ?? source }
@@ -69,6 +125,10 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
         case "--title": n.title = value()
         case "--message": n.message = value()
         case "--subtitle": subtitle = value()
+        case "--kind":
+            let k = value()
+            guard kinds[k] != nil else { fail("--kind is one of: \(kinds.keys.sorted().joined(separator: ", "))") }
+            n.kind = k
         case "--key": n.key = value()
         case "--urgency":
             n.urgency = value()
@@ -76,9 +136,13 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
         case "--sound": n.sound = true
         case "--if-new": n.ifNew = true
         case "--activate": n.action["activate"] = value()
+        case "--iterm-session":
+            let id = value()
+            guard validItermSession(id) else { fail("--iterm-session takes an iTerm2 session id (ITERM_SESSION_ID)") }
+            n.action["iterm"] = itermSessionUUID(id)
         case "--open":
             let url = value()
-            guard let u = URL(string: url), ["https", "http"].contains(u.scheme ?? "") else { fail("--open takes an http(s) URL") }
+            guard let u = URL(string: url), openSchemes.contains(u.scheme ?? "") else { fail("--open takes an http(s) or codex:// URL") }
             n.action["open"] = url
         case "--run":
             let argv = Array(args[(i + 1)...])
@@ -97,6 +161,8 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
         n.title = words.count > 1 ? words[1].prefix(1).uppercased() + words[1].dropFirst() : "Notice"
         if let subtitle = subtitle { n.message = subtitle + " — " + n.message }
         if n.sound { n.urgency = "urgent" }
+    } else {
+        n.subtitle = subtitle.map { String($0.prefix(80)) }
     }
     guard validSource(n.source) else { fail("--source is lowercase letters, digits and dashes, up to 32") }
     guard !n.title.isEmpty, !n.message.isEmpty else { fail("--title and --message are required") }
@@ -182,19 +248,37 @@ func forget(_ identifier: String) {
 
 // MARK: - Posting
 
+// The badge for a kind, copied out of the app (macOS moves an attachment into its own store).
+func badgeAttachment(_ kind: String) -> [UNNotificationAttachment] {
+    guard let src = Bundle.main.url(forResource: kind, withExtension: "png", subdirectory: "badges") else { return [] }
+    let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("agent-notify-\(UUID().uuidString).png")
+    guard (try? FileManager.default.copyItem(at: src, to: tmp)) != nil,
+          let a = try? UNNotificationAttachment(identifier: "badge", url: tmp, options: nil) else { return [] }
+    return [a]
+}
+
 func content(for n: Notice) -> UNMutableNotificationContent {
+    let kind = n.kind ?? inferKind(n)
     let c = UNMutableNotificationContent()
-    c.title = "\(n.display) · \(n.title)"
+    let startsWithEmoji = n.title.unicodeScalars.first.map { $0.properties.isEmojiPresentation || $0.properties.isEmoji && $0.value > 0xFF } ?? false
+    c.title = startsWithEmoji ? n.title : "\(sourceEmoji[n.source] ?? "✨") \(n.title)"
+    c.subtitle = [n.display, n.subtitle].compactMap { $0 }.joined(separator: " · ")
     c.body = n.message
     c.threadIdentifier = n.source
-    c.userInfo = n.action
-    c.categoryIdentifier = n.action.isEmpty ? "notice" : "actionable"
+    var info = n.action
+    info["kind"] = kind
+    c.userInfo = info
+    c.attachments = badgeAttachment(kind)
+    if n.action["iterm"] != nil && kind == "claude-waiting" { c.categoryIdentifier = "reply" }
+    else if n.action.isEmpty { c.categoryIdentifier = "notice" }
+    else { c.categoryIdentifier = "actionable" }
+    let sound = kinds[kind]?.sound.map { UNNotificationSound(named: UNNotificationSoundName("\($0).aiff")) }
     switch n.urgency {
     case "low": c.interruptionLevel = .passive
-    case "urgent": c.interruptionLevel = .active; c.sound = .default; c.relevanceScore = 1
-    default: c.interruptionLevel = .active; c.relevanceScore = 0.5
+    case "urgent": c.interruptionLevel = .active; c.sound = sound ?? .default; c.relevanceScore = 1
+    default: c.interruptionLevel = .active; c.sound = sound; c.relevanceScore = 0.5
     }
-    if n.sound { c.sound = .default }
+    if n.sound && c.sound == nil { c.sound = .default }
     return c
 }
 
@@ -213,8 +297,8 @@ func post(_ n: Notice, done: @escaping (Int32) -> Void) {
         switch decision {
         case .skip: return
         case .fold(let count):
-            let summary = Notice(source: n.source, title: "\(count) more notice\(count == 1 ? "" : "s")",
-                                 message: "Latest: \(n.title). \(n.message)", key: "__more", urgency: "low")
+            let summary = Notice(source: n.source, title: "📚 \(count) more from \(n.display) while you were away",
+                                 message: "The latest one: \(n.title). \(n.message)", key: "__more", urgency: "low", kind: "pile")
             request = UNNotificationRequest(identifier: "\(n.source):__more", content: content(for: summary), trigger: nil)
             outcome = "folded"
         case .replace:
@@ -226,7 +310,8 @@ func post(_ n: Notice, done: @escaping (Int32) -> Void) {
         }
         center.add(request) { error in
             if let error = error { fail("\(error)", 4) }
-            record(["source": n.source, "key": n.key ?? "", "title": n.title, "urgency": n.urgency, "outcome": outcome])
+            record(["source": n.source, "key": n.key ?? "", "title": n.title, "urgency": n.urgency, "outcome": outcome,
+                    "action": n.action])
             print(outcome)
             done(0)
         }
@@ -247,8 +332,11 @@ func clear(source: String, key: String, done: @escaping (Int32) -> Void) {
 // MARK: - Click handling
 
 func runAction(_ info: [AnyHashable: Any]) {
-    if let url = info["open"] as? String, let u = URL(string: url), ["https", "http"].contains(u.scheme ?? "") {
+    if let url = info["open"] as? String, let u = URL(string: url), openSchemes.contains(u.scheme ?? "") {
         NSWorkspace.shared.open(u)
+    }
+    if let session = info["iterm"] as? String, validItermSession(session) {
+        focusItermSession(session)
     }
     if let argv = info["run"] as? [String], let exe = argv.first, exe.hasPrefix("/") {
         let process = Process()
@@ -264,6 +352,54 @@ func runAction(_ info: [AnyHashable: Any]) {
     }
 }
 
+// Bring the iTerm2 window, tab and split pane that hold this session to the front. The first
+// time, macOS asks once whether Agent Notify may control iTerm2.
+func focusItermSession(_ uuid: String) {
+    let source = """
+    tell application id "com.googlecode.iterm2"
+      repeat with w in windows
+        repeat with t in tabs of w
+          repeat with s in sessions of t
+            if unique id of s is "\(uuid)" then
+              tell w to select
+              tell t to select
+              tell s to select
+              activate
+              return
+            end if
+          end repeat
+        end repeat
+      end repeat
+    end tell
+    """
+    var error: NSDictionary?
+    NSAppleScript(source: source)?.executeAndReturnError(&error)
+    if let error = error { record(["outcome": "focus-failed", "source": "iterm", "key": "\(error[NSAppleScript.errorNumber] ?? "")"]) }
+}
+
+// Quick reply: type the text into that iTerm2 session and press Return, as if typed there.
+func typeIntoItermSession(_ uuid: String, _ text: String) {
+    let line = text.replacingOccurrences(of: "\r", with: " ").replacingOccurrences(of: "\n", with: " ")
+        .replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    let source = """
+    tell application id "com.googlecode.iterm2"
+      repeat with w in windows
+        repeat with t in tabs of w
+          repeat with s in sessions of t
+            if unique id of s is "\(uuid)" then
+              tell s to write text "\(line)"
+              return
+            end if
+          end repeat
+        end repeat
+      end repeat
+    end tell
+    """
+    var error: NSDictionary?
+    NSAppleScript(source: source)?.executeAndReturnError(&error)
+    if let error = error { record(["outcome": "reply-failed", "source": "iterm", "key": "\(error[NSAppleScript.errorNumber] ?? "")"]) }
+}
+
 // MARK: - Harness hooks
 
 func terminalBundle(_ env: [String: String]) -> String? {
@@ -275,6 +411,8 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
     let env = ProcessInfo.processInfo.environment
     var n = Notice()
     if let bundle = terminalBundle(env) { n.action["activate"] = bundle }
+    // A harness running in iTerm2: a click lands on its exact tab and pane.
+    if let session = env["ITERM_SESSION_ID"], validItermSession(session) { n.action["iterm"] = itermSessionUUID(session) }
     switch harness {
     case "claude":
         // Claude Code's Notification hook: {"session_id", "cwd", "message", ...} on stdin.
@@ -285,9 +423,12 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
         n.source = "claude"
         n.key = (json["session_id"] as? String).map { "session-\($0)" }
         let permission = message.lowercased().contains("permission")
-        n.title = permission ? "Needs permission" : "Waiting for you"
+        n.kind = permission ? "claude-permission" : "claude-waiting"
+        n.title = pickTitle(n.kind!, project: project.isEmpty ? nil : project, "Claude is waiting for you")
         n.urgency = permission ? "urgent" : "normal"
-        n.message = project.isEmpty ? message : "\(project): \(message)"
+        let hint = n.action["iterm"] == nil ? "Click to switch to it."
+            : permission ? "Click to jump to its iTerm tab and decide." : "Click to jump to its iTerm tab, or reply right here."
+        n.message = "\(message.hasSuffix(".") ? message : message + ".") \(hint)"
     case "codex":
         // Codex notify: the JSON payload is the last argument.
         let json = (args.last.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any] ?? [:]
@@ -295,9 +436,19 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
         let last = (json["last-assistant-message"] as? String) ?? "Turn finished"
         let project = ((json["cwd"] as? String) as NSString?)?.lastPathComponent
         n.source = "codex"
-        n.key = (json["thread-id"] as? String).map { "thread-\($0)" } ?? "turn"
-        n.title = "Turn finished"
-        n.message = (project.map { "\($0): " } ?? "") + last.replacingOccurrences(of: "\n", with: " ")
+        let thread = json["thread-id"] as? String
+        n.key = thread.map { "thread-\($0)" } ?? "turn"
+        // The Codex app (or a CLI run outside iTerm2): a click opens that conversation in the app.
+        let inApp = env["__CFBundleIdentifier"] == "com.openai.codex" || env["BROWSER_USE_CODEX_APP_VERSION"] != nil
+        if let thread = thread, thread.range(of: "^[0-9A-Za-z-]{1,80}$", options: .regularExpression) != nil,
+           inApp || n.action["iterm"] == nil {
+            n.action = ["open": "codex://threads/\(thread)", "activate": "com.openai.codex"]
+        }
+        n.message += n.action["open"] != nil ? " Click to open the conversation in Codex." : " Click to jump to its iTerm tab."
+        n.kind = "codex-done"
+        n.title = pickTitle("codex-done", project: project, "Codex finished its turn")
+        let said = last.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+        n.message = "It said: “\(said.count > 220 ? said.prefix(220) + "…" : Substring(said))”"
     default: fail("hook takes claude or codex")
     }
     n.message = String(n.message.prefix(400))
@@ -328,8 +479,10 @@ func runCommand(_ args: [String]) -> (Notice, Int32) {
     let code = process.terminationStatus
     let what = n.title
     n.key = n.key ?? "run-\(what)"
-    n.title = code == 0 ? "\(what) finished" : "\(what) failed"
-    n.message = code == 0 ? "Finished in \(took)." : "Exited with status \(code) after \(took)."
+    n.kind = code == 0 ? "run-ok" : "run-failed"
+    n.title = code == 0 ? "🚀 \(what) finished" : "💥 \(what) failed"
+    n.message = code == 0 ? "All good. It took \(took) and exited cleanly. 😎"
+                          : "It stopped with exit code \(code) after \(took). Click to see the output in your terminal. 🔍"
     if code != 0 { n.sound = true }
     if n.action["activate"] == nil, let bundle = terminalBundle(ProcessInfo.processInfo.environment) { n.action["activate"] = bundle }
     return (n, code)
@@ -348,16 +501,40 @@ func list(json: Bool) {
     }
 }
 
+// MARK: - status: is Agent Notify allowed, and do its notices stay on screen?
+
+func status(openSettings: Bool) {
+    UNUserNotificationCenter.current().getNotificationSettings { s in
+        let auth = [UNAuthorizationStatus.notDetermined: "not asked yet", .denied: "denied",
+                    .authorized: "allowed", .provisional: "provisional"][s.authorizationStatus] ?? "other"
+        let style = [UNAlertStyle.none: "none (Notification Center only)", .banner: "temporary banners (hide after ~5s)",
+                     .alert: "persistent (stay until dismissed)"][s.alertStyle] ?? "unknown"
+        print("notifications: \(auth)\nstyle: \(style)")
+        if s.alertStyle != .alert {
+            print("To keep notices on screen: System Settings > Notifications > Agent Notify > set style to Persistent (Alerts).")
+        }
+        if openSettings {
+            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=local.agents.notify")!)
+        }
+        exit(s.alertStyle == .alert ? 0 : 1)
+    }
+}
+
 // MARK: - App
 
 final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        let open = UNNotificationAction(identifier: "open", title: "Open", options: [.foreground])
+        let icon = { (name: String) in UNNotificationActionIcon(systemImageName: name) }
+        let open = UNNotificationAction(identifier: "open", title: "👉 Take me there", options: [.foreground], icon: icon("arrow.up.forward.app"))
+        let snooze = UNNotificationAction(identifier: "snooze", title: "😴 Remind me in 10 min", options: [], icon: icon("moon.zzz"))
+        let reply = UNTextInputNotificationAction(identifier: "reply", title: "💬 Reply", options: [], icon: icon("text.bubble"),
+                                                  textInputButtonTitle: "Send", textInputPlaceholder: "Message Claude…")
         center.setNotificationCategories([
-            UNNotificationCategory(identifier: "actionable", actions: [open], intentIdentifiers: []),
-            UNNotificationCategory(identifier: "notice", actions: [], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "actionable", actions: [open, snooze], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "reply", actions: [reply, open, snooze], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "notice", actions: [snooze], intentIdentifiers: []),
         ])
         var args = Array(CommandLine.arguments.dropFirst())
         let finish: (Int32) -> Void = { code in exit(code) }
@@ -386,8 +563,10 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
         case "list":
             list(json: args.contains("--json"))
             exit(0)
+        case "status":
+            status(openSettings: args.contains("--open-settings"))
         case "--help", "-h", "help":
-            print("usage: agent-notify post|clear|run|hook|list ... (see ~/.agents/lib/agent-notify/README.md)")
+            print("usage: agent-notify post|clear|run|hook|list|status ... (see ~/Code/agent-notify/README.md)")
             exit(0)
         default:
             guard args.contains("--title") else { fail("unknown command \(command)") }
@@ -397,11 +576,35 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler done: @escaping () -> Void) {
-        if [UNNotificationDefaultActionIdentifier, "open"].contains(response.actionIdentifier) {
-            runAction(response.notification.request.content.userInfo)
-            let id = response.notification.request.identifier
+        let request = response.notification.request
+        let id = request.identifier
+        let entry = { (outcome: String) in
+            record(["source": String(id.split(separator: ":").first ?? ""),
+                    "key": String(id.split(separator: ":", maxSplits: 1).last ?? ""), "outcome": outcome])
+        }
+        switch response.actionIdentifier {
+        case UNNotificationDefaultActionIdentifier, "open":
+            runAction(request.content.userInfo)
             forget(id)
-            record(["source": String(id.split(separator: ":").first ?? ""), "key": String(id.split(separator: ":", maxSplits: 1).last ?? ""), "outcome": "clicked"])
+            entry("clicked")
+        case "snooze":
+            // Hand it back to macOS with a 10-minute timer; it comes back even though this app exits.
+            let c = request.content.mutableCopy() as! UNMutableNotificationContent
+            if !c.title.hasPrefix("⏰") { c.title = "⏰ Reminder: " + c.title }
+            c.attachments = badgeAttachment(request.content.userInfo["kind"] as? String ?? "bell")
+            let again = UNNotificationRequest(identifier: id, content: c,
+                                              trigger: UNTimeIntervalNotificationTrigger(timeInterval: 600, repeats: false))
+            entry("snoozed")
+            center.add(again) { _ in done(); exit(0) }
+            return
+        case "reply":
+            if let text = (response as? UNTextInputNotificationResponse)?.userText,
+               let session = request.content.userInfo["iterm"] as? String, validItermSession(session) {
+                typeIntoItermSession(session, text)
+                forget(id)
+                entry("replied")
+            }
+        default: break
         }
         done()
         exit(0)

@@ -8,11 +8,13 @@ A tiny ad-hoc-signed app (`~/.local/libexec/agent-notify/Agent Notify.app`, bund
 
 ```sh
 agent-notify post --source TOOL --title "what happened" --message "detail" \
-  [--key KEY] [--urgency low|normal|urgent] [--sound] [--if-new] \
-  [--open https://... | --run /abs/program args...] [--activate BUNDLE_ID]
+  [--subtitle TEXT] [--kind KIND] [--key KEY] [--urgency low|normal|urgent] [--sound] [--if-new] \
+  [--open https://...|codex://threads/ID | --run /abs/program args...] \
+  [--iterm-session $ITERM_SESSION_ID] [--activate BUNDLE_ID]
 agent-notify clear --source TOOL --key KEY        # withdraw once resolved
 agent-notify run --source scripts --title "Nightly backup" -- /path/to/backup.sh args
-agent-notify list [--json]                        # recent history
+agent-notify list [--json]                        # recent history (with each click target)
+agent-notify status [--open-settings]             # allowed? persistent or temporary banners?
 ```
 
 - `--source` is the tool (`browserctrl`, `agent-vault`, `claude`, `codex`, `scripts`, …).
@@ -27,6 +29,47 @@ agent-notify list [--json]                        # recent history
   `--activate`'s app forward. Nothing else in a notice is ever executed.
 - `run` reports "<title> finished in 3m 12s" or "<title> failed" with the exit status,
   and exits with the command's status.
+
+## Kinds: badge, sound and copy
+
+Every notice gets an emoji badge (drawn by `badges.swift`, shown on the right), a system
+sound, and a title that starts with its tool's emoji (🧡 Claude Code, 🤖 Codex, 🌐 browserctrl,
+🗝️ agent-vault, ⚙️ Scripts). Pass `--kind`, or it is guessed from the tool and title.
+
+| Kind | Badge | Sound | Used for |
+|---|---|---|---|
+| `claude-waiting` | 👋 coral | Pop | Claude Code is waiting for you |
+| `claude-permission` | 🙋 red | Hero | Claude Code needs a permission |
+| `codex-done` | 🎉 mint | Glass | a Codex turn finished |
+| `browser-handoff` / `-signin` / `-debug` | 🧩 / 🚪 / 🔌 blue | Submarine | browserctrl needs you in a tab |
+| `vault-approval` | 🔐 gold | Purr | agent-vault approval |
+| `run-ok` / `run-failed` | 🚀 green / 💥 red | Ping / Basso | `agent-notify run` results |
+| `pile` | 📚 purple | none | the "N more piling up" summary |
+| `bell` | 🔔 indigo | Tink | anything else |
+
+The hooks and `run` pick a random title from a few lines per kind ("Ball's in your court 🎾👀",
+"Mic drop 🎤⬇️", "Deploy went kaboom 🧨"), and put the project in the subtitle (📁 name).
+Low-urgency notices are silent.
+
+## Click and actions
+
+- **Click / 🏃 Jump in**: go to where it came from. A Claude Code or Codex CLI session in iTerm2
+  focuses its exact window, tab and split pane. A Codex app turn opens that thread
+  (`codex://threads/<id>`). browserctrl focuses the tab; agent-vault opens the approval page.
+- **💬 Reply** (Claude Code waiting, in iTerm2): types your text into that pane and presses Return.
+- **😴 Snooze 10 min**: macOS brings the notice back in 10 minutes, marked ⏰.
+
+The first iTerm2 focus or reply asks once whether Agent Notify may control iTerm2.
+
+## Staying on screen
+
+macOS shows a notice as a temporary banner (hides after about 5 s) or a persistent alert (stays
+until dismissed), chosen per app in System Settings. The app asks for persistent alerts, but
+macOS only applies that default the first time an app registers. `agent-notify status` reports
+the current style; `--open-settings` opens the pane to switch it to Persistent.
+
+Urgent notices can't be time-sensitive (break through Focus): that entitlement needs a
+provisioning profile, and macOS kills an ad-hoc-signed app that claims it.
 
 ## Design and anti-spam
 
@@ -44,11 +87,18 @@ agent-notify list [--json]                        # recent history
 | browserctrl | Tab handoffs (captcha, sign-in): urgent, keyed per tab, opens the tab, withdrawn when solved |
 | agent-vault | Approval requests: urgent, keyed per request, opens the approval page, withdrawn when decided |
 | Claude Code | `Notification` hook in `~/.claude/settings.json`: `agent-notify hook claude`; built-in channel off |
-| Codex | `notify` in `~/.codex/config.toml` → `~/.agents/bin/codex-notify` (keeps Computer Use's signal) |
+| Codex | `notify` in `~/.codex/config.toml` → `bin/codex-notify` (keeps Computer Use's signal) |
 | Scripts | `agent-notify run --source scripts --title … -- cmd` |
 
 ## Build
 
-`./build.sh` compiles `main.swift`, draws the icon from `icon.swift`, signs ad hoc and
+`./build.sh` compiles `main.swift`, draws the icon from `icon.swift` and the badges from
+`badges.swift`, copies the system sounds, signs ad hoc and
 registers the app. The first post asks macOS for permission once (System Settings →
 Notifications → Agent Notify).
+
+## Install
+
+The repo lives at `~/Code/agent-notify`, linked as `~/.agents/skills/agent-notify`. The
+`agent-notify` shim in `~/.agents/bin` (linked into `~/.local/bin` by `~/.agents/scripts/setup.sh`)
+runs the built app.
