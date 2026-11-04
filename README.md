@@ -52,12 +52,22 @@ The hooks and `run` pick a random title from a few lines per kind ("👋 Claude 
 and end the body with what a click does.
 Low-urgency notices are silent.
 
+## Buttons
+
+Up to 3 `--button` per notice; without any, the kind's defaults (below). Specs: `go`, `snooze`,
+`reply` (optionally `=Your label`), `"Label=https://…"` / `codex://…`, `"Label=/abs/program args"`,
+or `--no-buttons`. Every distinct set of buttons is registered with macOS as a category and kept
+(newest 64) in `~/.local/state/agent-notify/categories.json`. See `SKILL.md` for copy guidance.
+
 ## Click and actions
 
 - **Click / 👉 Take me there**: go to where it came from. A Claude Code or Codex CLI session in iTerm2
   focuses its exact window, tab and split pane. A Codex app turn opens that thread
   (`codex://threads/<id>`). browserctrl focuses the tab; agent-vault opens the approval page.
-- **💬 Reply** (Claude Code waiting, in iTerm2): types your text into that pane and presses Return.
+- **💬 Reply to Claude** (Claude Code waiting, in iTerm2): types your text into that pane and presses Return.
+- The Claude hook quotes what Claude last said (from the session transcript), not the generic
+  "waiting for your input". The default click button is labelled for where it goes
+  ("👀 Review it", "💬 Open conversation", "🔐 Review request", "🧭 Open the tab", "🔍 Show me").
 - **😴 Remind me in 10 min**: macOS brings the notice back in 10 minutes, marked ⏰.
   Plain notices with nowhere to go have no buttons, so nothing covers their text on hover.
 

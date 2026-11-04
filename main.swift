@@ -108,6 +108,7 @@ struct Notice {
     var kind: String?
     var subtitle: String?
     var expire: TimeInterval = defaultExpire
+    var buttons: [[String: Any]]?          // nil = the kind's defaults; [] = no buttons
     var action: [String: Any] = [:]
     var identifier: String { "\(source):\(key ?? UUID().uuidString)" }
     var display: String { displayNames[source] ?? source }
@@ -139,6 +140,11 @@ func parseNotice(_ args: [String], legacy: Bool) -> Notice {
             n.urgency = value()
             guard ["low", "normal", "urgent"].contains(n.urgency) else { fail("--urgency is low, normal or urgent") }
         case "--sound": n.sound = true
+        case "--button":
+            if n.buttons == nil { n.buttons = [] }
+            n.buttons!.append(parseButton(value()))
+            guard n.buttons!.count <= 3 else { fail("at most 3 --button") }
+        case "--no-buttons": n.buttons = []
         case "--expire":
             guard let secs = TimeInterval(value()), secs >= 0 else { fail("--expire takes seconds (0 = never)") }
             n.expire = secs
@@ -274,6 +280,94 @@ func badgeAttachment(_ kind: String) -> [UNNotificationAttachment] {
     return [a]
 }
 
+// MARK: - Buttons
+//
+// A button is {type, label, target?}. Types: go (the notice's own click target), snooze (back in
+// 10 min), reply (type into the notice's iTerm pane), open (a URL), run (a program by absolute path).
+//   --button go | snooze | reply            a preset with its default label
+//   --button "go=👀 Review the diff"         a preset with your own label
+//   --button "🚀 Open MR=https://…"          a labelled URL (http, https, codex)
+//   --button "🔁 Rerun=/abs/script arg"      a labelled program (absolute path, space-separated args)
+// macOS shows the first button on hover and the rest under Options.
+
+let presetLabels = ["go": "👉 Take me there", "snooze": "😴 Remind me in 10 min", "reply": "💬 Reply"]
+
+func parseButton(_ spec: String) -> [String: Any] {
+    let parts = spec.split(separator: "=", maxSplits: 1).map { String($0).trimmingCharacters(in: .whitespaces) }
+    if let label = presetLabels[parts[0]] {
+        return ["type": parts[0], "label": parts.count > 1 && !parts[1].isEmpty ? String(parts[1].prefix(40)) : label]
+    }
+    guard parts.count == 2, !parts[0].isEmpty else { fail("--button is go|snooze|reply[=Label] or \"Label=URL\" or \"Label=/abs/program args\"") }
+    let label = String(parts[0].prefix(40)), target = parts[1]
+    if target.hasPrefix("/") {
+        return ["type": "run", "label": label, "target": target.split(separator: " ").map(String.init)]
+    }
+    guard let u = URL(string: target), openSchemes.contains(u.scheme ?? "") else { fail("--button target must be an http(s)/codex URL or an absolute program path") }
+    return ["type": "open", "label": label, "target": target]
+}
+
+// What a notice gets when its sender doesn't choose: the click target under a label that says
+// where it goes, a reply box for a waiting Claude in iTerm2, and a 10-minute reminder.
+func defaultButtons(_ n: Notice, kind: String) -> [[String: Any]] {
+    guard !n.action.isEmpty else { return [] }
+    let opensCodex = (n.action["open"] as? String)?.hasPrefix("codex:") ?? false
+    let go: String
+    switch kind {
+    case "claude-permission": go = "👀 Review it"
+    case "codex-done": go = opensCodex ? "💬 Open conversation" : "👉 Take me there"
+    case "browser-handoff", "browser-signin", "browser-debug": go = "🧭 Open the tab"
+    case "vault-approval": go = "🔐 Review request"
+    case "run-failed": go = "🔍 Show me"
+    default: go = "👉 Take me there"
+    }
+    var list: [[String: Any]] = []
+    if kind == "claude-waiting" && n.action["iterm"] != nil { list.append(["type": "reply", "label": "💬 Reply to Claude"]) }
+    list.append(["type": "go", "label": go])
+    list.append(["type": "snooze", "label": presetLabels["snooze"]!])
+    return list
+}
+
+// macOS needs every set of buttons registered as a category before a notice can use it, and
+// registering replaces the whole list, so the sets seen so far are kept (newest 64) and
+// re-registered together.
+func categoryId(_ buttons: [[String: Any]]) -> String {
+    var h: UInt64 = 5381
+    for b in buttons { for ch in "\(b["type"] ?? ""):\(b["label"] ?? "")|".utf8 { h = (h &* 33) ^ UInt64(ch) } }
+    return "b-\(String(h, radix: 36))"
+}
+
+func registerCategories(adding buttons: [[String: Any]]? = nil) -> String? {
+    let path = stateDir + "/categories.json"
+    var known = ((try? JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path)))) as? [[String: Any]]) ?? []
+    var id: String?
+    if let buttons = buttons, !buttons.isEmpty {
+        let cid = categoryId(buttons)
+        id = cid
+        let shape = buttons.map { ["type": $0["type"] ?? "", "label": $0["label"] ?? ""] }
+        known.removeAll { ($0["id"] as? String) == cid }
+        known.append(["id": cid, "buttons": shape])
+        known = Array(known.suffix(64))
+        if let data = try? JSONSerialization.data(withJSONObject: known) { try? data.write(to: URL(fileURLWithPath: path), options: .atomic) }
+    }
+    let icons = ["go": "arrow.up.forward.app", "snooze": "moon.zzz", "reply": "text.bubble", "open": "link", "run": "play.circle"]
+    var categories: Set<UNNotificationCategory> = [UNNotificationCategory(identifier: "notice", actions: [], intentIdentifiers: [])]
+    for entry in known {
+        guard let cid = entry["id"] as? String, let list = entry["buttons"] as? [[String: Any]] else { continue }
+        let actions: [UNNotificationAction] = list.enumerated().map { i, b in
+            let type = b["type"] as? String ?? "go", label = b["label"] as? String ?? "Open"
+            let icon = UNNotificationActionIcon(systemImageName: icons[type] ?? "circle")
+            if type == "reply" {
+                return UNTextInputNotificationAction(identifier: "btn\(i)", title: label, options: [], icon: icon,
+                                                     textInputButtonTitle: "Send", textInputPlaceholder: "Type your reply…")
+            }
+            return UNNotificationAction(identifier: "btn\(i)", title: label, options: type == "snooze" ? [] : [.foreground], icon: icon)
+        }
+        categories.insert(UNNotificationCategory(identifier: cid, actions: actions, intentIdentifiers: []))
+    }
+    UNUserNotificationCenter.current().setNotificationCategories(categories)
+    return id
+}
+
 func content(for n: Notice) -> UNMutableNotificationContent {
     let kind = n.kind ?? inferKind(n)
     let c = UNMutableNotificationContent()
@@ -284,13 +378,20 @@ func content(for n: Notice) -> UNMutableNotificationContent {
     // One group per session/thread/event, not per tool: macOS stacks a group, and the first click
     // on a stack only expands it, so per-tool groups made clicks look like they did nothing.
     c.threadIdentifier = n.key.map { "\(n.source):\($0)" } ?? n.source
+    // Buttons that need something the notice lacks are dropped (reply without an iTerm pane).
+    let buttons = (n.buttons ?? defaultButtons(n, kind: kind)).filter { b in
+        switch b["type"] as? String {
+        case "reply": return n.action["iterm"] != nil
+        case "go": return !n.action.isEmpty
+        default: return true
+        }
+    }
     var info = n.action
     info["kind"] = kind
+    info["buttons"] = buttons
     c.userInfo = info
     c.attachments = badgeAttachment(kind)
-    if n.action["iterm"] != nil && kind == "claude-waiting" { c.categoryIdentifier = "reply" }
-    else if n.action.isEmpty { c.categoryIdentifier = "notice" }
-    else { c.categoryIdentifier = "actionable" }
+    c.categoryIdentifier = registerCategories(adding: buttons) ?? "notice"
     let sound = kinds[kind]?.sound.map { UNNotificationSound(named: UNNotificationSoundName("\($0).aiff")) }
     switch n.urgency {
     case "low": c.interruptionLevel = .passive
@@ -458,6 +559,28 @@ func terminalBundle(_ env: [String: String]) -> String? {
     return env["TERM_PROGRAM"].flatMap { terminalBundles[$0] }
 }
 
+// The last text Claude wrote in a session, from the end of its transcript (JSONL), on one line.
+func lastClaudeText(_ path: String) -> String? {
+    guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+    defer { handle.closeFile() }
+    let size = handle.seekToEndOfFile()
+    handle.seek(toFileOffset: size > 400_000 ? size - 400_000 : 0)
+    let tail = String(decoding: handle.readDataToEndOfFile(), as: UTF8.self)
+    for line in tail.split(separator: "\n").reversed() {
+        guard line.contains("\"assistant\""),
+              let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+              obj["type"] as? String == "assistant",
+              let parts = (obj["message"] as? [String: Any])?["content"] as? [[String: Any]] else { continue }
+        if let text = parts.last(where: { $0["type"] as? String == "text" })?["text"] as? String {
+            let flat = text.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "**", with: "")
+                .replacingOccurrences(of: "`", with: "").trimmingCharacters(in: .whitespaces)
+            guard !flat.isEmpty else { continue }
+            return flat.count > 200 ? String(flat.prefix(200)) + "…" : flat
+        }
+    }
+    return nil
+}
+
 func hookNotice(_ harness: String, _ args: [String]) -> Notice {
     let env = ProcessInfo.processInfo.environment
     var n = Notice()
@@ -480,7 +603,12 @@ func hookNotice(_ harness: String, _ args: [String]) -> Notice {
         n.urgency = permission ? "urgent" : "normal"
         let hint = n.action["iterm"] == nil ? "Click to switch to it."
             : permission ? "Click to jump to its iTerm tab and decide." : "Click to jump to its iTerm tab, or reply right here."
-        n.message = "\(message.hasSuffix(".") ? message : message + ".") \(hint)"
+        // Quote what Claude actually last said, not Claude Code's generic "waiting for your input".
+        if !permission, let said = (json["transcript_path"] as? String).flatMap(lastClaudeText) {
+            n.message = "It said: “\(said)” \(hint)"
+        } else {
+            n.message = "\(message.hasSuffix(".") ? message : message + ".") \(hint)"
+        }
     case "codex":
         // Codex notify: the JSON payload is the last argument.
         let json = (args.last.flatMap { try? JSONSerialization.jsonObject(with: Data($0.utf8)) }) as? [String: Any] ?? [:]
@@ -586,16 +714,8 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let center = UNUserNotificationCenter.current()
-        let icon = { (name: String) in UNNotificationActionIcon(systemImageName: name) }
-        let open = UNNotificationAction(identifier: "open", title: "👉 Take me there", options: [.foreground], icon: icon("arrow.up.forward.app"))
-        let snooze = UNNotificationAction(identifier: "snooze", title: "😴 Remind me in 10 min", options: [], icon: icon("moon.zzz"))
-        let reply = UNTextInputNotificationAction(identifier: "reply", title: "💬 Reply", options: [], icon: icon("text.bubble"),
-                                                  textInputButtonTitle: "Send", textInputPlaceholder: "Message Claude…")
-        center.setNotificationCategories([
-            UNNotificationCategory(identifier: "actionable", actions: [open, snooze], intentIdentifiers: []),
-            UNNotificationCategory(identifier: "reply", actions: [reply, open, snooze], intentIdentifiers: []),
-            UNNotificationCategory(identifier: "notice", actions: [], intentIdentifiers: []),
-        ])
+        _ = center
+        _ = registerCategories()
         var args = Array(CommandLine.arguments.dropFirst())
         let finish: (Int32) -> Void = { code in exit(code) }
         guard let command = args.first else {
@@ -646,8 +766,28 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
             record(["source": String(id.split(separator: ":").first ?? ""),
                     "key": String(id.split(separator: ":", maxSplits: 1).last ?? ""), "outcome": outcome])
         }
-        switch response.actionIdentifier {
-        case UNNotificationDefaultActionIdentifier, "open":
+        let info = request.content.userInfo
+        var action = response.actionIdentifier
+        var button: [String: Any] = [:]
+        if action.hasPrefix("btn"), let i = Int(action.dropFirst(3)), let list = info["buttons"] as? [[String: Any]], i < list.count {
+            button = list[i]
+            action = button["type"] as? String ?? "go"
+        }
+        switch action {
+        case "open" where button["target"] != nil:
+            if let url = button["target"] as? String, let u = URL(string: url), openSchemes.contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
+            forget(id)
+            entry("clicked: \(button["label"] ?? "")")
+        case "run":
+            if let argv = button["target"] as? [String], let exe = argv.first, exe.hasPrefix("/") {
+                let p = Process()
+                p.executableURL = URL(fileURLWithPath: exe)
+                p.arguments = Array(argv.dropFirst())
+                try? p.run()
+            }
+            forget(id)
+            entry("clicked: \(button["label"] ?? "")")
+        case UNNotificationDefaultActionIdentifier, "open", "go":
             runAction(request.content.userInfo)
             forget(id)
             entry("clicked")
