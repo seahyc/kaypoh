@@ -1,8 +1,8 @@
 # Show HN draft
 
-**Title:** Show HN: agent-notify – macOS notifications that take you to the agent's exact pane
+**Title:** Show HN: Kaypoh – macOS notifications that take you to the agent's exact pane
 
-**URL:** https://github.com/seahyc/agent-notify
+**URL:** https://github.com/seahyc/kaypoh
 
 **Text:**
 
@@ -10,7 +10,7 @@ I run four or five Claude Code and Codex sessions at once, split across iTerm2 p
 built-in bell tells me something is done. It doesn't tell me which session, or what it said, so I
 end up tabbing through panes to find the one that's waiting.
 
-agent-notify is a small macOS app (one Swift file, no Electron) that hooks into Claude Code and
+Kaypoh (Singlish for a nosy neighbour who knows everyone's business) is a small macOS app (one Swift file, no Electron) that hooks into Claude Code and
 Codex. When a turn finishes or needs permission, you get a notice with the project name and the
 agent's last message as the body. Clicking it focuses the exact iTerm2 split pane or tmux pane,
 the VS Code or Cursor window for that repo, or the Codex app thread. You can also type a reply in

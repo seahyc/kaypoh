@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end tests against a built Agent Notify.app, all in --dry-run (nothing is posted) and in a
+"""End-to-end tests against a built Kaypoh.app, all in --dry-run (nothing is posted) and in a
 sandboxed HOME (your real ~/.claude and ~/.codex are never touched).
 
     NO_REGISTER=1 APP_DIR=/tmp/an-test ./build.sh && APP_DIR=/tmp/an-test python3 tests/test_cli.py
@@ -13,9 +13,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-APP = Path(os.environ.get("APP_DIR", "/tmp/an-test")) / "Agent Notify.app/Contents/MacOS/agent-notify"
+APP = Path(os.environ.get("APP_DIR", "/tmp/an-test")) / "Kaypoh.app/Contents/MacOS/kaypoh"
 PACKS = {p.stem: json.loads(p.read_text()) for p in (ROOT / "personas").glob("*.json")}
-SHIM = "/opt/example/bin/agent-notify"
+SHIM = "/opt/example/bin/kaypoh"
 
 
 def titles(voice, kind, **fill):
@@ -30,8 +30,8 @@ def titles(voice, kind, **fill):
 class CLI(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp(prefix="an-home-"))
-        self.env = {"HOME": str(self.home), "PATH": "/usr/bin:/bin", "AGENT_NOTIFY_SHIM": SHIM,
-                    "AGENT_NOTIFY_VOICE": "genz", "AGENT_NOTIFY_MIN_SECONDS": "20"}
+        self.env = {"HOME": str(self.home), "PATH": "/usr/bin:/bin", "KAYPOH_SHIM": SHIM,
+                    "KAYPOH_VOICE": "genz", "KAYPOH_MIN_SECONDS": "20"}
 
     def tearDown(self):
         shutil.rmtree(self.home, ignore_errors=True)
@@ -40,7 +40,7 @@ class CLI(unittest.TestCase):
         e = dict(self.env, **(env or {}))
         argv = [str(APP), *args] + (["--dry-run"] if dry and args[0] not in ("hook",) else [])
         if dry and args[0] == "hook":
-            e["AGENT_NOTIFY_DRY_RUN"] = "1"
+            e["KAYPOH_DRY_RUN"] = "1"
         p = subprocess.run(argv, input=stdin, capture_output=True, text=True, env=e, timeout=30)
         self.assertEqual(p.returncode, code, f"{argv}\nstdout: {p.stdout}\nstderr: {p.stderr}")
         return p.stdout.strip()
@@ -73,7 +73,7 @@ class CLI(unittest.TestCase):
         n = self.claude({"hook_event_name": "Stop", "session_id": "s3", "last_assistant_message": "hi"})
         self.assertEqual(n, {"skipped": "short turn"})
         n = self.claude({"hook_event_name": "Stop", "session_id": "s3", "last_assistant_message": "hi"},
-                        env={"AGENT_NOTIFY_MIN_SECONDS": "0"})
+                        env={"KAYPOH_MIN_SECONDS": "0"})
         self.assertEqual(n["kind"], "done")
 
     def test_prompt_submit_is_silent(self):
@@ -154,25 +154,35 @@ class CLI(unittest.TestCase):
     def test_every_pack_renders_every_demo(self):
         kinds = ["done", "waiting", "permission", "handoff", "signin", "approval", "run-ok", "run-failed", "pile"]
         for voice in PACKS:
-            out = self.run_app("demo", *kinds, env={"AGENT_NOTIFY_VOICE": voice}).splitlines()
+            out = self.run_app("demo", *kinds, env={"KAYPOH_VOICE": voice}).splitlines()
             got = [json.loads(line) for line in out]
             self.assertEqual([n["kind"] for n in got], kinds, voice)
             for n in got:
                 self.assertNotIn("{", n["title"] + n["body"] + "".join(n["buttons"]), f"{voice}: unfilled placeholder in {n}")
 
+    def test_names_from_before_the_rename_still_work(self):
+        env = {"KAYPOH_VOICE": "", "AGENT_NOTIFY_VOICE": "plain"}
+        self.assertIn(self.notice("demo", "done", env=env)["title"], titles("plain", "done", agent="Claude"))
+        old = self.home / ".config/agent-notify"
+        old.mkdir(parents=True)
+        (old / "config.json").write_text(json.dumps({"voice": "butler"}))
+        self.assertIn(self.notice("demo", "done", env={"KAYPOH_VOICE": ""})["title"], titles("butler", "done", agent="Claude"))
+        n = self.notice("post", "--source", "x", "--title", "t", "--message", "m", "--kind", "codex-done")
+        self.assertEqual(n["kind"], "done")
+
     def test_unknown_voice_falls_back_to_plain(self):
-        n = self.notice("demo", "done", env={"AGENT_NOTIFY_VOICE": "nope"})
+        n = self.notice("demo", "done", env={"KAYPOH_VOICE": "nope"})
         self.assertIn(n["title"], titles("plain", "done", agent="Claude"))
 
     def test_voice_command_and_custom_packs(self):
         custom = dict(PACKS["plain"], name="mine", titles=dict(PACKS["plain"]["titles"], done=["🦄 {agent} did a thing"]))
-        d = self.home / ".config/agent-notify/personas"
+        d = self.home / ".config/kaypoh/personas"
         d.mkdir(parents=True)
         (d / "mine.json").write_text(json.dumps(custom))
-        env = {"AGENT_NOTIFY_VOICE": ""}
+        env = {"KAYPOH_VOICE": ""}
         self.assertIn("mine", self.run_app("voice", env=env, dry=False))
         self.run_app("voice", "mine", env=env, dry=False)
-        self.assertEqual(json.loads((self.home / ".config/agent-notify/config.json").read_text())["voice"], "mine")
+        self.assertEqual(json.loads((self.home / ".config/kaypoh/config.json").read_text())["voice"], "mine")
         self.assertEqual(self.notice("demo", "done", env=env)["title"], "🦄 Claude did a thing")
         self.run_app("voice", "does-not-exist", env=env, dry=False, code=2)
 
@@ -205,7 +215,7 @@ class CLI(unittest.TestCase):
         self.assertIn("/usr/local/bin/other-tool", [h["command"] for g in hooks["Notification"] for h in g["hooks"]])
         self.assertEqual(hooks["PreToolUse"], original["hooks"]["PreToolUse"])
         self.assertEqual(settings["model"], "opus")
-        self.assertTrue((self.home / ".claude/settings.json.agent-notify.bak").exists())
+        self.assertTrue((self.home / ".claude/settings.json.kaypoh.bak").exists())
         toml = codex.read_text()
         self.assertIn(f'notify = ["{SHIM}","hook","codex","--previous-notify","[\\"/usr/local/bin/ding\\",\\"--loud\\"]"]', toml)
         self.assertIn("[profiles.fast]", toml)

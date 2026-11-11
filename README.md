@@ -1,9 +1,12 @@
-# agent-notify
+# kaypoh
 
-**Notifications for your coding agents that take you to the right pane, in a voice you pick.**
+**The busybody that tells you which coding agent needs you, and takes you there.**
+
+*Kaypoh* (KAY-poh) is Singlish for a nosy neighbour who knows everyone's business. This one
+minds your agents' business so you don't have to.
 
 Claude Code finished in one tab, Codex wants permission in another, and a test run died in a
-third. agent-notify tells you which one, quotes what the agent said, and a click lands on that
+third. kaypoh tells you which one, quotes what the agent said, and a click lands on that
 exact iTerm2 pane, tmux pane, VS Code or Cursor window, or Codex thread. It's macOS-native, free,
 and nothing leaves your Mac.
 
@@ -17,13 +20,13 @@ in checkout-service
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/seahyc/agent-notify/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/seahyc/kaypoh/main/install.sh | sh
 ```
 
 or with Homebrew:
 
 ```sh
-brew install seahyc/tap/agent-notify && agent-notify install
+brew install seahyc/tap/kaypoh && kaypoh install
 ```
 
 Either way, it builds a tiny app from source (needs the Xcode Command Line Tools:
@@ -31,9 +34,9 @@ Either way, it builds a tiny app from source (needs the Xcode Command Line Tools
 backed up first and other hooks are left alone. Then:
 
 ```sh
-agent-notify demo            # see a few
-agent-notify voice           # list voices
-agent-notify voice tiger-mum # pick one
+kaypoh demo            # see a few
+kaypoh voice           # list voices
+kaypoh voice tiger-mum # pick one
 ```
 
 ## What you get
@@ -67,7 +70,7 @@ agent-notify voice tiger-mum # pick one
 
 A voice is a JSON file of titles, button labels and a few message lines per event
 ([`personas/plain.json`](personas/plain.json) is the reference). To make your own, copy one to
-`~/.config/agent-notify/personas/NAME.json`, edit it, and run `agent-notify voice NAME`.
+`~/.config/kaypoh/personas/NAME.json`, edit it, and run `kaypoh voice NAME`.
 `python3 tests/check_personas.py your.json` checks it against the limits macOS uses for
 truncation. Pull requests with new voices are welcome.
 
@@ -77,7 +80,7 @@ truncation. Pull requests with new voices are welcome.
 |---|---|
 | Claude Code (terminal, VS Code, desktop) | `Stop`, `Notification` and `UserPromptSubmit` hooks in `~/.claude/settings.json` |
 | Codex (CLI and app) | `notify` in `~/.codex/config.toml`. An existing notify program is chained, not replaced. |
-| Anything else | `agent-notify post …` from a hook, a script, or the agent itself (below) |
+| Anything else | `kaypoh post …` from a hook, a script, or the agent itself (below) |
 
 | Where the agent runs | A click goes to |
 |---|---|
@@ -92,14 +95,14 @@ truncation. Pull requests with new voices are welcome.
 Any agent or script can post, and the agent can write its own copy and buttons:
 
 ```sh
-agent-notify post --source claude --key deploy-482 \
+kaypoh post --source claude --key deploy-482 \
   --title "🙋 Can I push the hotfix to prod?" --subtitle "in checkout-service" \
   --message "Tests pass. It touches billing, so I want your OK first." \
   --iterm-session "$ITERM_SESSION_ID" --urgency urgent \
   --button "go=👀 Review it" --button "🚀 Open MR=https://gitlab.com/…/merge_requests/482" --button snooze
 
-agent-notify run --source scripts --title "Nightly backup" -- ./backup.sh   # reports how it went
-agent-notify clear --source claude --key deploy-482                         # withdraw once resolved
+kaypoh run --source scripts --title "Nightly backup" -- ./backup.sh   # reports how it went
+kaypoh clear --source claude --key deploy-482                         # withdraw once resolved
 ```
 
 - `--key` names the event. Posting the same key replaces the notice, `--if-new` posts only if
@@ -119,31 +122,31 @@ agent-notify clear --source claude --key deploy-482                         # wi
 
 ## Settings
 
-`~/.config/agent-notify/config.json`, or the matching environment variable:
+`~/.config/kaypoh/config.json`, or the matching environment variable:
 
 | Key | Env | Default | |
 |---|---|---|---|
-| `voice` | `AGENT_NOTIFY_VOICE` | `genz` | persona pack name |
-| `minSeconds` | `AGENT_NOTIFY_MIN_SECONDS` | `20` | shorter agent turns don't notify |
-| `expire` | `AGENT_NOTIFY_EXPIRE` | `60` | seconds before a notice tidies away (`0` = never) |
+| `voice` | `KAYPOH_VOICE` | `genz` | persona pack name |
+| `minSeconds` | `KAYPOH_MIN_SECONDS` | `20` | shorter agent turns don't notify |
+| `expire` | `KAYPOH_EXPIRE` | `60` | seconds before a notice tidies away (`0` = never) |
 
 macOS shows notices either as banners that hide after about 5 s, or as alerts that stay until
-dismissed. `agent-notify install` opens the settings pane so you can choose. `agent-notify
+dismissed. `kaypoh install` opens the settings pane so you can choose. `kaypoh
 status` shows the current style, the voice, and whether the hooks are wired.
 
 ## Uninstall
 
 ```sh
-agent-notify uninstall          # removes only its own hooks; a chained Codex notify is restored
-rm -rf ~/.local/share/agent-notify ~/.local/libexec/agent-notify ~/.local/bin/agent-notify
+kaypoh uninstall          # removes only its own hooks; a chained Codex notify is restored
+rm -rf ~/.local/share/kaypoh ~/.local/libexec/kaypoh ~/.local/bin/kaypoh   # or: brew uninstall kaypoh
 ```
 
 ## How it works
 
-A single Swift file builds a small ad-hoc-signed app (`Agent Notify.app`, no Dock icon) that
+A single Swift file builds a small ad-hoc-signed app (`Kaypoh.app`, no Dock icon) that
 posts through Notification Center. The click target travels inside the notice, so macOS
 relaunches the app on a click and it focuses the pane. It never executes anything except the
-target you or the hook put there. State and history live in `~/.local/state/agent-notify/`.
+target you or the hook put there. State and history live in `~/.local/state/kaypoh/`.
 There's no network, no telemetry, and no model calls: the agent's own words are the copy.
 
 Urgent notices can't break through Focus modes, because that entitlement needs a paid Apple
@@ -156,5 +159,7 @@ provisioning profile.
 NO_REGISTER=1 APP_DIR=/tmp/an-test ./build.sh && APP_DIR=/tmp/an-test python3 tests/test_cli.py
 python3 tests/check_personas.py
 ```
+
+Formerly `agent-notify`. That command and the `AGENT_NOTIFY_*` variables still work.
 
 MIT licensed.

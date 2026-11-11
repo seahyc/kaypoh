@@ -10,10 +10,10 @@ Done in the repo:
 
 Needs the owner (outward-facing, not done):
 - [ ] Decide on the commit author email: history uses a work address
-- [ ] Decide on the name (agent-notify collides with several projects; see the naming notes)
-- [ ] Make github.com/seahyc/agent-notify public
+- [x] Name: Kaypoh (formerly agent-notify; the old command still works)
+- [ ] Make github.com/seahyc/kaypoh public
 - [ ] Tag `v1.0.0` and create a GitHub release
-- [ ] Create `seahyc/homebrew-tap`, copy `packaging/homebrew/agent-notify.rb` to `Formula/`, fill in sha256
+- [ ] Create `seahyc/homebrew-tap`, copy `packaging/homebrew/kaypoh.rb` to `Formula/`, fill in sha256
 - [ ] Run `install.sh` on a clean macOS user account (no ~/.agents, no iTerm2) end to end
 - [ ] Try Claude Code in VS Code and the Claude desktop app (hooks are documented to fire there; untested here)
 - [ ] Record the click-to-pane clip for PH and X

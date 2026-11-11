@@ -1,16 +1,16 @@
 ---
-name: agent-notify
-description: Post, replace, clear or inspect macOS notifications through agent-notify (your own copy and buttons, a badge per kind, a click that lands on the exact iTerm2/tmux pane, editor window, Codex thread or page). Use when you need the user's attention or a decision, when reporting a long command's result, or when debugging why a notice didn't show, vanished, or didn't focus the right place.
+name: kaypoh
+description: Post, replace, clear or inspect macOS notifications through kaypoh (your own copy and buttons, a badge per kind, a click that lands on the exact iTerm2/tmux pane, editor window, Codex thread or page). Use when you need the user's attention or a decision, when reporting a long command's result, or when debugging why a notice didn't show, vanished, or didn't focus the right place.
 ---
 
-# agent-notify
+# kaypoh
 
-`agent-notify` is on PATH. Claude Code and Codex already notify on their own when a turn ends
-or needs permission (`agent-notify install` wires that). Post yourself only when you have
+`kaypoh` is on PATH. Claude Code and Codex already notify on their own when a turn ends
+or needs permission (`kaypoh install` wires that). Post yourself only when you have
 something more specific to say or ask.
 
 ```sh
-agent-notify post --source claude --key KEY \
+kaypoh post --source claude --key KEY \
   --title "🙋 Can I push the hotfix to prod?" \
   --subtitle "in checkout-service" \
   --message "Tests pass on the branch. It touches billing, so I want your OK first." \
@@ -20,8 +20,8 @@ agent-notify post --source claude --key KEY \
 
 ## Writing the copy
 
-Match the user's voice: `agent-notify status` prints it (genz, plain, tiger-mum,
-passive-aggressive-coworker, …), and `agent-notify demo --dry-run` shows sample lines. Whatever
+Match the user's voice: `kaypoh status` prints it (genz, plain, tiger-mum,
+passive-aggressive-coworker, …), and `kaypoh demo --dry-run` shows sample lines. Whatever
 the voice, the user should get the point in one look. The voice is flavour; what happened has
 to stay obvious.
 
@@ -70,12 +70,12 @@ report"). Offer the choices the user would actually make, best one first.
 - Use one `--key` per resolvable thing.
   - Re-posting the same key replaces the notice.
   - `--if-new` skips it if one is already showing.
-  - `agent-notify clear --source S --key K` withdraws it once resolved.
+  - `kaypoh clear --source S --key K` withdraws it once resolved.
 - Notices tidy away after 1 minute (`--expire SECONDS`, `0` = stay until dismissed).
-- Long commands: `agent-notify run --source scripts --title "Nightly backup" -- /path/cmd args`.
+- Long commands: `kaypoh run --source scripts --title "Nightly backup" -- /path/cmd args`.
 - Debug:
   - `--dry-run` prints the notice instead of posting it.
-  - `agent-notify list --json` shows outcomes, click targets and which button was used.
-  - `agent-notify status` shows permission, banner style, voice and hooks.
+  - `kaypoh list --json` shows outcomes, click targets and which button was used.
+  - `kaypoh status` shows permission, banner style, voice and hooks.
 
 Full reference: `README.md`. After editing `main.swift`, `badges.swift` or `build.sh`, run `./build.sh`.

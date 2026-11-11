@@ -1,4 +1,4 @@
-// Draws the Agent Notify app icon (1024 px PNG): a big emoji bell on a sunset-to-lagoon gradient,
+// Draws the Kaypoh app icon (1024 px PNG): a big emoji bell on a sunset-to-lagoon gradient,
 // with a few of the notice badges' emoji orbiting it. Full-bleed square: macOS applies its own
 // rounded mask. Usage: swift icon.swift OUT.png
 import AppKit

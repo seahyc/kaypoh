@@ -1,14 +1,15 @@
-// agent-notify: one notification layer for every coding agent on this Mac.
+// kaypoh: the busybody that tells you which coding agent needs you (Singlish: kaypoh, a nosy
+// neighbour who knows everyone's business). One notification layer for every agent on this Mac.
 //
-//   agent-notify post   --source TOOL --title "what happened" --message TEXT [options]
-//   agent-notify clear  --source TOOL --key KEY          withdraw a notice once it is resolved
-//   agent-notify run    --source TOOL --title WHAT -- /cmd args...   run it, then report the result
-//   agent-notify hook   claude|codex                     harness hooks (JSON on stdin / last arg)
-//   agent-notify install [--claude] [--codex] [--dry-run] / uninstall   wire the hooks in
-//   agent-notify voice  [NAME]                           list persona packs, or pick one
-//   agent-notify demo   [KIND...]                        post sample notices in the current voice
-//   agent-notify list   [--json]                         recent history
-//   agent-notify status [--open-settings]                permission, banner style, hooks
+//   kaypoh       post   --source TOOL --title "what happened" --message TEXT [options]
+//   kaypoh       clear  --source TOOL --key KEY          withdraw a notice once it is resolved
+//   kaypoh       run    --source TOOL --title WHAT -- /cmd args...   run it, then report the result
+//   kaypoh       hook   claude|codex                     harness hooks (JSON on stdin / last arg)
+//   kaypoh       install [--claude] [--codex] [--dry-run] / uninstall   wire the hooks in
+//   kaypoh       voice  [NAME]                           list persona packs, or pick one
+//   kaypoh       demo   [KIND...]                        post sample notices in the current voice
+//   kaypoh       list   [--json]                         recent history
+//   kaypoh       status [--open-settings]                permission, banner style, hooks
 //
 // One design: every notice says who and what, carries its own click target (open a URL, focus an
 // iTerm2 pane or tmux pane, run one program by absolute path, then bring an app forward), and the
@@ -20,29 +21,39 @@
 // one "N more" notice; urgent notices always show; agent turns shorter than 20 s don't notify.
 //
 // The copy (titles, buttons, summary lines) comes from a persona pack: personas/*.json in the
-// app, or ~/.config/agent-notify/personas/NAME.json.
+// app, or ~/.config/kaypoh/personas/NAME.json.
 
 import Cocoa
 import UserNotifications
 
-let appName = "agent-notify"
-let appDisplayName = "Agent Notify"
-let bundleId = "com.seahyc.agent-notify"
+let appName = "kaypoh"
+let appDisplayName = "Kaypoh"
+let bundleId = "com.seahyc.kaypoh"
+// The name before v1; hooks and Codex config that mention it are ours too.
+let formerNames = ["agent-notify"]
+func mentionsUs(_ s: String) -> Bool { ([appName] + formerNames).contains { s.contains($0) } }
 let appVersion = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "dev"
 
 let env = ProcessInfo.processInfo.environment
+// KAYPOH_X, or AGENT_NOTIFY_X from before the rename.
+func envSetting(_ name: String) -> String? {
+    for prefix in ["KAYPOH_", "AGENT_NOTIFY_"] { if let v = env[prefix + name], !v.isEmpty { return v } }
+    return nil
+}
 let home = env["HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
 let stateDir = (home as NSString).appendingPathComponent(".local/state/\(appName)")
-let configDir = env["XDG_CONFIG_HOME"].map { ($0 as NSString).appendingPathComponent(appName) }
-    ?? (home as NSString).appendingPathComponent(".config/\(appName)")
-let dryRun = env["AGENT_NOTIFY_DRY_RUN"] == "1" || CommandLine.arguments.contains("--dry-run")
+let configBase = env["XDG_CONFIG_HOME"] ?? (home as NSString).appendingPathComponent(".config")
+// ~/.config/kaypoh, or the folder from before the rename if that's the one that exists.
+let configDir = ([appName] + formerNames).map { (configBase as NSString).appendingPathComponent($0) }
+    .first { FileManager.default.fileExists(atPath: $0) } ?? (configBase as NSString).appendingPathComponent(appName)
+let dryRun = envSetting("DRY_RUN") == "1" || CommandLine.arguments.contains("--dry-run")
 
 func fail(_ message: String, _ code: Int32 = 2) -> Never {
     FileHandle.standardError.write(("\(appName): " + message + "\n").data(using: .utf8)!)
     exit(code)
 }
 
-// MARK: - Config: ~/.config/agent-notify/config.json, overridden by AGENT_NOTIFY_* variables
+// MARK: - Config: ~/.config/kaypoh/config.json, overridden by KAYPOH_* variables
 
 func readJSON(_ path: String) -> Any? {
     guard let data = FileManager.default.contents(atPath: path) else { return nil }
@@ -58,7 +69,7 @@ func writeJSON(_ object: Any, to path: String) throws {
 let configPath = configDir + "/config.json"
 let config = (readJSON(configPath) as? [String: Any]) ?? [:]
 func setting(_ envName: String, _ key: String) -> String? {
-    if let v = env[envName], !v.isEmpty { return v }
+    if let v = envSetting(envName) { return v }
     if let v = config[key] { return "\(v)" }
     return nil
 }
@@ -66,13 +77,13 @@ func setting(_ envName: String, _ key: String) -> String? {
 let window: TimeInterval = 600
 let perWindow = 3
 // Notices tidy themselves away after this long; 0 keeps them until dismissed.
-let defaultExpire = TimeInterval(setting("AGENT_NOTIFY_EXPIRE", "expire") ?? "") ?? 60
+let defaultExpire = TimeInterval(setting("EXPIRE", "expire") ?? "") ?? 60
 // An agent turn shorter than this doesn't notify: you were probably still watching.
-let minTurnSeconds = TimeInterval(setting("AGENT_NOTIFY_MIN_SECONDS", "minSeconds") ?? "") ?? 20
+let minTurnSeconds = TimeInterval(setting("MIN_SECONDS", "minSeconds") ?? "") ?? 20
 
 // MARK: - Tools, kinds and badges
 
-// Tools agent-notify knows by name: what to call them, and the emoji that starts their titles.
+// Tools kaypoh knows by name: what to call them, and the emoji that starts their titles.
 let tools: [String: (display: String, agent: String, emoji: String)] = [
     "claude": ("Claude Code", "Claude", "🧡"), "codex": ("Codex", "Codex", "🤖"),
     "cursor": ("Cursor", "Cursor", "🖱️"), "gemini": ("Gemini", "Gemini", "♊️"),
@@ -116,8 +127,8 @@ func inferKind(_ n: Notice) -> String {
 
 // MARK: - Persona packs
 
-// The voice: AGENT_NOTIFY_VOICE, or "voice" in config.json, or Gen Z. Missing lines fall back to plain.
-let voice = setting("AGENT_NOTIFY_VOICE", "voice") ?? "genz"
+// The voice: KAYPOH_VOICE, or "voice" in config.json, or Gen Z. Missing lines fall back to plain.
+let voice = setting("VOICE", "voice") ?? "genz"
 
 func packPaths() -> [String: String] {
     var found: [String: String] = [:]
@@ -410,7 +421,7 @@ func parseButton(_ spec: String) -> [String: Any] {
     if target.hasPrefix("/") {
         return ["type": "run", "label": label, "target": target.split(separator: " ").map(String.init)]
     }
-    guard let u = URL(string: target), openSchemes.contains(u.scheme ?? "") else { fail("--button target must be a URL agent-notify can open or an absolute program path") }
+    guard let u = URL(string: target), openSchemes.contains(u.scheme ?? "") else { fail("--button target must be a URL kaypoh can open or an absolute program path") }
     return ["type": "open", "label": label, "target": target]
 }
 
@@ -685,7 +696,7 @@ func runAppleScript(_ source: String, failure: String) {
 }
 
 // Bring the iTerm2 window, tab and split pane that hold this session to the front. The first
-// time, macOS asks once whether Agent Notify may control iTerm2.
+// time, macOS asks once whether Kaypoh may control iTerm2.
 func focusItermSession(_ uuid: String) {
     runAppleScript(iterm(uuid, "tell w to select\n tell t to select\n tell s to select\n activate"), failure: "focus-failed")
 }
@@ -921,9 +932,9 @@ func runCommand(_ args: [String]) -> (Notice, Int32) {
 
 // MARK: - install: wire the hooks into Claude Code and Codex
 
-// The command hooks should run: agent-notify on PATH if it is there, else this app's binary.
+// The command hooks should run: kaypoh on PATH if it is there, else this app's binary.
 func selfCommand() -> String {
-    if let shim = env["AGENT_NOTIFY_SHIM"], shim.hasPrefix("/") { return shim }
+    if let shim = envSetting("SHIM"), shim.hasPrefix("/") { return shim }
     if let found = findExecutable(appName) { return found }
     return Bundle.main.executablePath ?? appName
 }
@@ -937,7 +948,7 @@ let codexDir = env["CODEX_HOME"] ?? (home as NSString).appendingPathComponent(".
 
 func isOurClaudeHook(_ h: [String: Any]) -> Bool {
     let cmd = h["command"] as? String ?? ""
-    return cmd.contains(appName) && cmd.contains("hook claude")
+    return mentionsUs(cmd) && cmd.contains("hook claude")
 }
 
 // Remove our hook handlers everywhere, keeping everyone else's (and dropping groups we emptied).
@@ -996,7 +1007,7 @@ func codexConfig(install: Bool) -> (path: String, before: String, after: String,
         let data = try! JSONSerialization.data(withJSONObject: argv, options: [.withoutEscapingSlashes])
         return "notify = " + String(decoding: data, as: UTF8.self)
     }
-    let ours = current.map { $0.contains(appName) } ?? false
+    let ours = current.map(mentionsUs) ?? false
     if install {
         if ours { return (path, before, before, "Codex already notifies through \(appName)") }
         var argv = [selfCommand(), "hook", "codex"]
@@ -1014,10 +1025,10 @@ func codexConfig(install: Bool) -> (path: String, before: String, after: String,
     } else {
         guard ours, let i = notifyIndex else { return (path, before, before, nil) }
         if let argv = array(lines[i]), let p = argv.firstIndex(of: "--previous-notify"), p + 1 < argv.count,
-           argv[0].contains(appName),
+           mentionsUs(argv[0]),
            let previous = (try? JSONSerialization.jsonObject(with: Data(argv[p + 1].utf8))) as? [String] {
             lines[i] = toml(previous)
-        } else if array(lines[i])?.first?.contains(appName) == true {
+        } else if array(lines[i])?.first.map(mentionsUs) == true {
             lines.remove(at: i)
         } else {
             return (path, before, before, "Codex's notify chains \(appName) inside another program; edit \(path) by hand")
@@ -1042,9 +1053,9 @@ func installHooks(_ args: [String], install: Bool) {
             } else if dryRun {
                 printJSON(["file": path, "hooks": after["hooks"] ?? [:]])
             } else {
-                if FileManager.default.fileExists(atPath: path) { try? FileManager.default.removeItem(atPath: path + ".agent-notify.bak"); try? FileManager.default.copyItem(atPath: path, toPath: path + ".agent-notify.bak") }
+                if FileManager.default.fileExists(atPath: path) { try? FileManager.default.removeItem(atPath: path + ".\(appName).bak"); try? FileManager.default.copyItem(atPath: path, toPath: path + ".\(appName).bak") }
                 do { try writeJSON(after, to: path) } catch { fail("can't write \(path): \(error.localizedDescription)", 1) }
-                print("Claude Code: \(verb) Stop, Notification and UserPromptSubmit hooks in \(path)\(install ? " (backup: settings.json.agent-notify.bak)" : "")")
+                print("Claude Code: \(verb) Stop, Notification and UserPromptSubmit hooks in \(path)\(install ? " (backup: settings.json.\(appName).bak)" : "")")
                 changed = true
             }
         }
@@ -1061,7 +1072,7 @@ func installHooks(_ args: [String], install: Bool) {
             } else if dryRun {
                 print("\(path):\n" + after.components(separatedBy: "\n").filter { $0.hasPrefix("notify") }.joined(separator: "\n"))
             } else {
-                if FileManager.default.fileExists(atPath: path) { try? FileManager.default.removeItem(atPath: path + ".agent-notify.bak"); try? FileManager.default.copyItem(atPath: path, toPath: path + ".agent-notify.bak") }
+                if FileManager.default.fileExists(atPath: path) { try? FileManager.default.removeItem(atPath: path + ".\(appName).bak"); try? FileManager.default.copyItem(atPath: path, toPath: path + ".\(appName).bak") }
                 do {
                     try FileManager.default.createDirectory(atPath: codexDir, withIntermediateDirectories: true)
                     try after.write(toFile: path, atomically: true, encoding: .utf8)
@@ -1083,7 +1094,7 @@ func voices() {
         let sample = ((p["titles"] as? [String: Any])?["done"] as? [String])?.first.map { fill($0, ["agent": "Claude"]) } ?? ""
         print("\(mark) \(name.padding(toLength: 28, withPad: " ", startingAt: 0)) \(sample)")
     }
-    print("\nPick one: \(appName) voice NAME   (or AGENT_NOTIFY_VOICE=NAME). Your own packs: \(configDir)/personas/")
+    print("\nPick one: \(appName) voice NAME   (or KAYPOH_VOICE=NAME). Your own packs: \(configDir)/personas/")
 }
 
 func setVoice(_ name: String) {
@@ -1092,7 +1103,7 @@ func setVoice(_ name: String) {
     c["voice"] = name
     do { try writeJSON(c, to: configPath) } catch { fail("can't write \(configPath): \(error.localizedDescription)", 1) }
     print("voice: \(name)")
-    if let v = env["AGENT_NOTIFY_VOICE"], !v.isEmpty, v != name { print("(AGENT_NOTIFY_VOICE=\(v) is set and still wins in this shell)") }
+    if let v = envSetting("VOICE"), v != name { print("(a KAYPOH_VOICE/AGENT_NOTIFY_VOICE of \(v) is set and still wins in this shell)") }
 }
 
 func demoNotices(_ kinds: [String]) -> [Notice] {
@@ -1141,7 +1152,7 @@ func hooksSummary() -> String {
     let claude = (claudeSettings(install: false).before["hooks"] as? [String: Any]).map { hooks in
         hooks.values.contains { ($0 as? [[String: Any]])?.contains { (($0["hooks"] as? [[String: Any]]) ?? []).contains(where: isOurClaudeHook) } ?? false }
     } ?? false
-    let codex = codexConfig(install: false).before.components(separatedBy: "\n").contains { $0.hasPrefix("notify") && $0.contains(appName) }
+    let codex = codexConfig(install: false).before.components(separatedBy: "\n").contains { $0.hasPrefix("notify") && mentionsUs($0) }
     return "hooks: Claude Code \(claude ? "wired" : "not wired"), Codex \(codex ? "wired" : "not wired")"
 }
 

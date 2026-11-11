@@ -23,6 +23,8 @@ Ten voices. Passive-aggressive coworker is a little too real.
 [image grid: coworker "Thanks!", butler, cat, auntie "Can or not?", drill sergeant]
 
 5/
+It's called Kaypoh: Singlish for the nosy neighbour who knows everyone's business.
+
 Free, open source, macOS, works with Claude Code and Codex. Voices are JSON, so write your own.
 
-github.com/seahyc/agent-notify
+github.com/seahyc/kaypoh

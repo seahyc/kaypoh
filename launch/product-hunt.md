@@ -1,14 +1,14 @@
 # Product Hunt draft
 
-**Name:** agent-notify
+**Name:** Kaypoh
 
-**Tagline (60 chars max):** Agent notifications that take you to the right pane
-(alternatives: "Your coding agents, now with a tiger mum" · "Know which agent needs you, and go there")
+**Tagline (60 chars max):** The busybody that knows which agent needs you
+(alternatives: "Agent notifications that take you to the right pane" · "Your coding agents, now with a tiger mum")
 
 **Topics:** Developer Tools, Mac, Artificial Intelligence, Open Source
 
 **Description (260 chars max):**
-Running several Claude Code or Codex sessions? agent-notify tells you which one finished or needs
+Running several Claude Code or Codex sessions? kaypoh tells you which one finished or needs
 you, quotes what it said, and one click lands on that exact pane or window. Ten voices, from
 plain to tiger mum. Free, open source, local.
 
@@ -19,15 +19,15 @@ plain to tiger mum. Free, open source, local.
    waiting.
 3. Reply from the notice: type "yes, open the PR" → it appears in the pane.
 4. The voice grid: one notice in each of the ten voices.
-5. Terminal: `curl … | sh`, `agent-notify voice tiger-mum`.
+5. Terminal: `curl … | sh`, `kaypoh voice tiger-mum`.
 
 **Maker's first comment:**
 
-Hi PH 👋 I built this for myself. I usually have four or five agent sessions going across
+Hi PH 👋 "Kaypoh" is Singlish for the nosy neighbour who knows everyone's business. I built this one to mind my agents' business. I usually have four or five agent sessions going across
 iTerm2 panes, and the default bell only told me that something was done, not which session or
 what it said.
 
-agent-notify hooks into Claude Code and Codex. Each notice says which project, quotes the
+kaypoh hooks into Claude Code and Codex. Each notice says which project, quotes the
 agent's last message, and the click lands on the exact pane (iTerm2, tmux), the editor window
 (VS Code, Cursor, Windsurf), or the Codex thread. You can reply from the notice too.
 

@@ -1,0 +1,11 @@
+#!/bin/sh
+# kaypoh: runs the binary inside Kaypoh.app (built by build.sh).
+# Looks next to this script first (../libexec/kaypoh), then ~/.local/libexec.
+dir="$(cd "$(dirname "$0")" && pwd -P)"
+for app in "${KAYPOH_APP:-}" "$dir/../libexec/kaypoh/Kaypoh.app" "$HOME/.local/libexec/kaypoh/Kaypoh.app"; do
+  if [ -n "$app" ] && [ -x "$app/Contents/MacOS/kaypoh" ]; then
+    exec "$app/Contents/MacOS/kaypoh" "$@"
+  fi
+done
+echo "kaypoh: Kaypoh.app not found; run build.sh (or reinstall)" >&2
+exit 127

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Codex `notify` program: keeps Computer Use's turn-ended signal exactly as before, then posts
-# the turn through the unified agent-notify layer. Codex appends its JSON payload as the last argument.
+# the turn through kaypoh. Codex appends its JSON payload as the last argument.
 client="$HOME/.codex/computer-use/Codex Computer Use.app/Contents/SharedSupport/SkyComputerUseClient.app/Contents/MacOS/SkyComputerUseClient"
 [ -x "$client" ] && "$client" turn-ended "$@"
-"$HOME/.local/bin/agent-notify" hook codex "$@" >/dev/null 2>&1 || true
+"$(dirname "$0")/kaypoh" hook codex "$@" >/dev/null 2>&1 || true
