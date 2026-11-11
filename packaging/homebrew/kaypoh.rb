@@ -6,7 +6,7 @@ class Kaypoh < Formula
   desc "Busybody notifications for coding agents: the right pane, in a voice you pick"
   homepage "https://github.com/seahyc/kaypoh"
   url "https://github.com/seahyc/kaypoh/archive/refs/tags/v1.0.1.tar.gz"
-  sha256 "a422facc26e07928f9977f0c0d7d2726743c64133f2c7e53f63218050c39e126"
+  sha256 "cd4b7df8e5205412fca70cc0200d70ef33451c971fb2d70412f7e637786269b4"
   license "MIT"
   head "https://github.com/seahyc/kaypoh.git", branch: "main"
 
