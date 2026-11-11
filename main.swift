@@ -1353,8 +1353,16 @@ final class Delegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterD
     }
 }
 
-let app = NSApplication.shared
 let delegate = Delegate()
-app.delegate = delegate
-app.setActivationPolicy(.accessory)
-app.run()
+// Commands that never touch Notification Center run without starting the app (faster, and they
+// work where LaunchServices isn't available, such as Homebrew's test sandbox).
+let headlessCommands: Set<String> = ["version", "--version", "-v", "help", "--help", "-h", "list", "voice", "voices", "persona"]
+if dryRun || headlessCommands.contains(CommandLine.arguments.dropFirst().first ?? "") {
+    delegate.applicationDidFinishLaunching(Notification(name: Notification.Name("headless")))
+    RunLoop.main.run()
+} else {
+    let app = NSApplication.shared
+    app.delegate = delegate
+    app.setActivationPolicy(.accessory)
+    app.run()
+}

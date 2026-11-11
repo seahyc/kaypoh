@@ -5,16 +5,16 @@
 class Kaypoh < Formula
   desc "Busybody notifications for coding agents: the right pane, in a voice you pick"
   homepage "https://github.com/seahyc/kaypoh"
-  url "https://github.com/seahyc/kaypoh/archive/refs/tags/v1.0.0.tar.gz"
-  sha256 "REPLACE_ON_RELEASE"
+  url "https://github.com/seahyc/kaypoh/archive/refs/tags/v1.0.1.tar.gz"
+  sha256 "a422facc26e07928f9977f0c0d7d2726743c64133f2c7e53f63218050c39e126"
   license "MIT"
   head "https://github.com/seahyc/kaypoh.git", branch: "main"
 
-  depends_on :macos
   depends_on macos: :ventura
 
   def install
-    system "./build.sh", { "APP_DIR" => libexec.to_s }
+    ENV["APP_DIR"] = libexec.to_s
+    system "./build.sh"
     (bin/"kaypoh").write <<~SH
       #!/bin/sh
       exec "#{opt_libexec}/Kaypoh.app/Contents/MacOS/kaypoh" "$@"
