@@ -1,0 +1,39 @@
+{
+  "name": "needy-partner",
+  "label": "Needy Partner",
+  "description": "Clingy, self-aware, 'it's fine, I'm fine'.",
+  "titles": {
+    "done": ["🥹 {agent} finished. Notice me?", "💌 {agent} is done. Come back", "🎉 {agent} done. Say something nice?", "🫶 {agent} is done. I missed you", "✅ {agent} finished. Look what I did"],
+    "waiting": ["🥺 {agent} waiting. I'm fine", "👀 {agent} has been waiting...", "💭 {agent} asked you something"],
+    "permission": ["🙋 {agent} needs your OK. Please?", "🥺 {agent} needs your OK to move", "✋ {agent} needs your approval", "🔒 {agent} stuck. Say yes?"],
+    "handoff": ["🧩 {agent} needs you. Right now"],
+    "signin": ["🚪 {agent} needs you to sign in"],
+    "approval": ["🔐 {agent} asks for access"],
+    "run-ok": ["🚀 {what} finished. You can relax", "💖 {what} worked. Proud of us?"],
+    "run-failed": ["💔 {what} failed. I need you", "😭 {what} failed. Don't be mad"],
+    "pile": ["📚 {count} more. Did you see?"]
+  },
+  "messages": {
+    "run-ok": [
+      "Took {took}, no errors. See? I can do things on my own."
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. It's not your fault. Come look?"
+    ],
+    "pile": [
+      "The latest: {title}. {message} Just so you know. No pressure."
+    ]
+  },
+  "buttons": {
+    "go": "👉 Come over here",
+    "go-done": "💌 See what I did",
+    "go-permission": "🙋 Hear me out",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 See the request",
+    "go-failed": "💔 See what broke",
+    "reply": "💬 Text {agent} back",
+    "snooze": "😴 Ask me in 10 min"
+  },
+  "snoozed": "⏰ Hi again. Still here: "
+}

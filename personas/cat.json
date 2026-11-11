@@ -1,0 +1,39 @@
+{
+  "name": "cat",
+  "label": "Cat",
+  "description": "Your agent's aloof roommate who sits on the keyboard.",
+  "titles": {
+    "done": ["🐈 I sat on keys. {agent} finished", "😼 {agent} is done. Didn't watch", "🐾 {agent} finished. Feed me now", "🐟 {agent} done. I knocked a cup", "😺 {agent} finished. You may pet me"],
+    "waiting": ["😾 {agent} is waiting. So am I", "🐈 {agent} is staring at you", "🙀 {agent} has a question. Hurry"],
+    "permission": ["🙋 {agent} needs your OK. Watching", "🐾 {agent} needs your OK. Paws off", "😼 {agent} is stuck until you OK", "🔒 {agent} blocked. Needs your OK"],
+    "handoff": ["🧩 {agent} needs you. I can't do it"],
+    "signin": ["🚪 {agent} needs a sign in"],
+    "approval": ["🔐 {agent} wants access. I'd say no"],
+    "run-ok": ["🚀 {what} finished. I allowed it", "😸 {what} worked. Pet me"],
+    "run-failed": ["💥 {what} failed. Not my fault", "🙀 {what} failed. I saw nothing"],
+    "pile": ["📚 {count} more. I sat on them"]
+  },
+  "messages": {
+    "run-ok": [
+      "Took {took}, no errors. I supervised from the windowsill."
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. I did not push it off the table. Probably."
+    ],
+    "pile": [
+      "The newest one: {title}. {message} Now feed me."
+    ]
+  },
+  "buttons": {
+    "go": "🐾 Follow the cat",
+    "go-done": "👀 Inspect the work",
+    "go-permission": "🐾 See the request",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 See the request",
+    "go-failed": "🙀 See the mess",
+    "reply": "💬 Meow at {agent}",
+    "snooze": "😴 Nap for 10 min"
+  },
+  "snoozed": "⏰ Meow. Again: "
+}

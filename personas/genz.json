@@ -1,0 +1,39 @@
+{
+  "name": "genz",
+  "label": "Gen Z",
+  "description": "Internet slang, still readable at a glance.",
+  "titles": {
+    "done": ["🎉 {agent} ate that turn", "💅 {agent} done, it's giving shipped", "✅ {agent} finished, ur move bestie", "🔥 {agent} cooked, come look", "☕️ {agent} done, ur court ngl"],
+    "waiting": ["👀 {agent} is waiting on u fr", "🫵 ur move, {agent} is waiting", "👋 {agent} has a q for u"],
+    "permission": ["🙋 {agent} needs ur OK, no cap", "🙏 {agent} needs ur OK to move", "✋ {agent} is asking permission rn", "🥺 {agent} needs a yes from u fr"],
+    "handoff": ["🧩 {agent} needs u to tap in rn"],
+    "signin": ["🚪 {agent} needs u to log in fr"],
+    "approval": ["🔐 {agent} wants the keys, ur call"],
+    "run-ok": ["🚀 {what} finished, slay", "🚀 {what} took the W"],
+    "run-failed": ["💥 {what} flopped 💀", "💥 {what} took an L"],
+    "pile": ["📚 {count} more, u were busy fr"]
+  },
+  "messages": {
+    "run-ok": [
+      "Took {took}, clean exit. Big W 😎"
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. Not the vibe 😬 Tap in to see what broke 🔍"
+    ],
+    "pile": [
+      "Latest drop: {title}. {message}"
+    ]
+  },
+  "buttons": {
+    "go": "👉 Take me there",
+    "go-done": "👀 Lemme see",
+    "go-permission": "👀 Lemme see",
+    "go-chat": "💬 Open the chat",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Check the request",
+    "go-failed": "🔍 Show me what broke",
+    "reply": "💬 Slide into {agent}'s DMs",
+    "snooze": "😴 Remind me in 10"
+  },
+  "snoozed": "⏰ Back again: "
+}

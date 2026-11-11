@@ -1,0 +1,39 @@
+{
+  "name": "butler",
+  "label": "Butler",
+  "description": "Impeccably polite British butler. If I may.",
+  "titles": {
+    "done": ["🎩 {agent} has finished. If I may", "🫖 {agent} is done. Your move", "✅ {agent} has concluded its task", "🥂 {agent} has finished, promptly", "🛎️ {agent} is done, at your leisure"],
+    "waiting": ["🎩 {agent} awaits your reply", "🛎️ {agent} begs a word with you", "🫖 {agent} awaits you, patiently"],
+    "permission": ["🎩 {agent} requests your approval", "🛎️ {agent} awaits your permission", "🙇 {agent} humbly needs your OK", "🔒 {agent} needs your OK, if I may"],
+    "handoff": ["🧩 {agent} requires your attention"],
+    "signin": ["🚪 {agent} requires you to sign in"],
+    "approval": ["🔐 {agent} requests access, if I may"],
+    "run-ok": ["🚀 {what} has succeeded", "🥂 {what} concluded splendidly"],
+    "run-failed": ["💥 {what} has failed, I regret", "🎩 {what} failed. Unfortunate"],
+    "pile": ["📚 {count} further notices"]
+  },
+  "messages": {
+    "run-ok": [
+      "It took {took} and concluded without incident. Shall I fetch tea?"
+    ],
+    "run-failed": [
+      "I regret to report exit code {code} after {took}. Do take a look at your convenience."
+    ],
+    "pile": [
+      "The most recent: {title}. {message} If I may."
+    ]
+  },
+  "buttons": {
+    "go": "🎩 Show me, please",
+    "go-done": "🧐 Inspect the work",
+    "go-permission": "📜 View the request",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 View the request",
+    "go-failed": "🔍 Inspect the damage",
+    "reply": "💬 Send word to {agent}",
+    "snooze": "🫖 Remind me in 10 min"
+  },
+  "snoozed": "⏰ A gentle reminder: "
+}

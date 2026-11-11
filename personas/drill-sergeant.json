@@ -1,0 +1,39 @@
+{
+  "name": "drill-sergeant",
+  "label": "Drill Sergeant",
+  "description": "Barked orders, caps in moderation, still readable.",
+  "titles": {
+    "done": ["🎖️ {agent} DONE. Move, soldier", "✅ {agent} finished. ON YOUR FEET", "💪 {agent} mission complete", "📣 {agent} reports DONE. Your turn", "🫡 {agent} done. Fall in, review"],
+    "waiting": ["📣 {agent} is waiting. Report NOW", "🫵 {agent} needs orders. Step up", "👀 {agent} has a question. ANSWER"],
+    "permission": ["🙋 {agent} needs your OK, soldier", "✋ {agent} HALTED. Give the OK", "🔒 {agent} blocked. Approve it", "📋 {agent} needs your OK. NOW"],
+    "handoff": ["🧩 {agent} needs YOU. Step in"],
+    "signin": ["🚪 {agent} needs sign-in. MOVE"],
+    "approval": ["🔐 {agent} requests access, sir"],
+    "run-ok": ["🚀 {what} SUCCEEDED. Good work", "🎖️ {what} done. Mission complete"],
+    "run-failed": ["💥 {what} FAILED. Drop and fix it", "🚨 {what} FAILED. Man down"],
+    "pile": ["📚 {count} more. Read up"]
+  },
+  "messages": {
+    "run-ok": [
+      "Mission complete in {took}. Clean exit. At ease."
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. Get to the output and FIX IT."
+    ],
+    "pile": [
+      "Latest report: {title}. {message} Eyes up."
+    ]
+  },
+  "buttons": {
+    "go": "👉 Move out",
+    "go-done": "🔎 Inspect the work",
+    "go-permission": "📋 Read the request",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Review request",
+    "go-failed": "🚨 Show me the damage",
+    "reply": "💬 Give {agent} orders",
+    "snooze": "😴 Ten minutes. No more"
+  },
+  "snoozed": "⏰ TEN MINUTES ARE UP: "
+}

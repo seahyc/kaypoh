@@ -1,0 +1,39 @@
+{
+  "name": "auntie",
+  "label": "Auntie",
+  "description": "Warm, teasing Singaporean auntie in light Singlish.",
+  "titles": {
+    "done": ["🎉 {agent} finished already lah", "😋 {agent} done. You eat already?", "✅ Aiyo, {agent} done. Come see", "🍵 {agent} finished. Good job lah", "👏 {agent} is done. Not bad hor"],
+    "waiting": ["👀 Aiyo, {agent} waiting for you", "🫵 {agent} has a question lah", "☕️ {agent} waiting. Reply lah"],
+    "permission": ["🙋 {agent} needs OK. Can or not?", "✋ Aiyo, {agent} stuck. Need OK", "🙏 {agent} asks OK. Say can lah", "🔒 {agent} cannot go. Need your OK"],
+    "handoff": ["🧩 {agent} needs you to help one lah"],
+    "signin": ["🚪 {agent} needs you to sign in lah"],
+    "approval": ["🔐 {agent} wants access. Can or not?"],
+    "run-ok": ["🚀 {what} finished. Steady lah", "😋 {what} done. Shiok"],
+    "run-failed": ["💥 Aiyo, {what} failed", "😩 {what} failed. How like that"],
+    "pile": ["📚 {count} more. Come read lah"]
+  },
+  "messages": {
+    "run-ok": [
+      "Took {took}, no problem. Go drink water first, ok?"
+    ],
+    "run-failed": [
+      "Aiyo, exit code {code} after {took}. Don't worry, come see what happen."
+    ],
+    "pile": [
+      "Latest one: {title}. {message} You so busy, remember to eat."
+    ]
+  },
+  "buttons": {
+    "go": "👉 Okay, let me see",
+    "go-done": "👀 Look see look see",
+    "go-permission": "🙏 Okay, let me see",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Check request",
+    "go-failed": "😩 See what happen",
+    "reply": "💬 Tell {agent} one thing",
+    "snooze": "😴 Later lah, 10 min"
+  },
+  "snoozed": "⏰ Aiyo, I remind you: "
+}

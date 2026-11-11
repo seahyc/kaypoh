@@ -4,13 +4,12 @@
 import AppKit
 
 let kinds: [(name: String, emoji: String, from: (CGFloat, CGFloat, CGFloat), to: (CGFloat, CGFloat, CGFloat))] = [
-    ("claude-waiting",    "👋", (0.98, 0.62, 0.42), (0.85, 0.36, 0.25)),  // Claude coral: your turn
-    ("claude-permission", "🙋", (1.00, 0.45, 0.35), (0.80, 0.16, 0.30)),  // hot red: hand raised
-    ("codex-done",        "🎉", (0.35, 0.90, 0.70), (0.10, 0.55, 0.60)),  // mint: turn finished
-    ("browser-handoff",   "🧩", (0.40, 0.70, 1.00), (0.25, 0.30, 0.85)),  // blue: captcha / step in
-    ("browser-signin",    "🚪", (0.55, 0.80, 1.00), (0.20, 0.45, 0.80)),  // sky: sign in
-    ("browser-debug",     "🔌", (0.45, 0.85, 0.95), (0.15, 0.50, 0.75)),  // cyan: click Allow
-    ("vault-approval",    "🔐", (1.00, 0.85, 0.35), (0.90, 0.50, 0.10)),  // gold: approve access
+    ("done",              "🎉", (0.35, 0.90, 0.70), (0.10, 0.55, 0.60)),  // mint: turn finished
+    ("waiting",           "👋", (0.98, 0.62, 0.42), (0.85, 0.36, 0.25)),  // coral: your turn
+    ("permission",        "🙋", (1.00, 0.45, 0.35), (0.80, 0.16, 0.30)),  // hot red: hand raised
+    ("handoff",           "🧩", (0.40, 0.70, 1.00), (0.25, 0.30, 0.85)),  // blue: captcha / step in
+    ("signin",            "🚪", (0.55, 0.80, 1.00), (0.20, 0.45, 0.80)),  // sky: sign in
+    ("approval",          "🔐", (1.00, 0.85, 0.35), (0.90, 0.50, 0.10)),  // gold: approve access
     ("run-ok",            "🚀", (0.55, 0.92, 0.45), (0.15, 0.62, 0.35)),  // green: landed
     ("run-failed",        "💥", (1.00, 0.40, 0.40), (0.60, 0.10, 0.20)),  // red: faceplant
     ("pile",              "📚", (0.80, 0.60, 1.00), (0.45, 0.25, 0.80)),  // purple: N more

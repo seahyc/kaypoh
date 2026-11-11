@@ -1,0 +1,39 @@
+{
+  "name": "plain",
+  "label": "Plain",
+  "description": "Clear, friendly, no jokes.",
+  "titles": {
+    "done": ["🎉 {agent} finished, your turn", "✅ {agent} is done", "🎉 {agent} wrapped up, over to you"],
+    "waiting": ["👋 {agent} is waiting for you", "☕️ {agent} is ready for you", "👋 {agent} has a question"],
+    "permission": ["🙋 {agent} needs your OK", "🙋 {agent} is asking permission", "✋ {agent} is paused for your OK"],
+    "handoff": ["🧩 {agent} needs you to step in"],
+    "signin": ["🚪 {agent} needs you to sign in"],
+    "approval": ["🔐 {agent} is asking for access"],
+    "run-ok": ["🚀 {what} finished"],
+    "run-failed": ["💥 {what} failed"],
+    "pile": ["📚 {count} more from {tool}", "📚 {count} more while you were out"]
+  },
+  "messages": {
+    "run-ok": [
+      "All good. It took {took} and exited cleanly."
+    ],
+    "run-failed": [
+      "It stopped with exit code {code} after {took}. Click to see the output."
+    ],
+    "pile": [
+      "The latest one: {title}. {message}"
+    ]
+  },
+  "buttons": {
+    "go": "👉 Take me there",
+    "go-done": "👀 Review it",
+    "go-permission": "👀 Review it",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Review request",
+    "go-failed": "🔍 Show me",
+    "reply": "💬 Reply to {agent}",
+    "snooze": "😴 Remind me in 10 min"
+  },
+  "snoozed": "⏰ Reminder: "
+}

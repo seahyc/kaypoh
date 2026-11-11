@@ -1,3 +1,11 @@
 #!/bin/sh
-# Clickable macOS notification; see ~/Code/agent-notify/main.swift. Build: ~/Code/agent-notify/build.sh
-exec "$HOME/.local/libexec/agent-notify/Agent Notify.app/Contents/MacOS/agent-notify" "$@"
+# agent-notify: runs the binary inside Agent Notify.app (built by build.sh).
+# Looks next to this script first (Homebrew: ../libexec/agent-notify), then ~/.local/libexec.
+dir="$(cd "$(dirname "$0")" && pwd -P)"
+for app in "${AGENT_NOTIFY_APP:-}" "$dir/../libexec/agent-notify/Agent Notify.app" "$HOME/.local/libexec/agent-notify/Agent Notify.app"; do
+  if [ -n "$app" ] && [ -x "$app/Contents/MacOS/agent-notify" ]; then
+    exec "$app/Contents/MacOS/agent-notify" "$@"
+  fi
+done
+echo "agent-notify: Agent Notify.app not found; run build.sh (or reinstall)" >&2
+exit 127

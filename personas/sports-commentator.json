@@ -1,0 +1,39 @@
+{
+  "name": "sports-commentator",
+  "label": "Sports Commentator",
+  "description": "Live play-by-play. AND IT'S IN!",
+  "titles": {
+    "done": ["🏆 AND IT'S IN! {agent} is done", "⚽ {agent} scores! Your ball", "🎙️ Stunning turn: {agent} is done", "🥇 {agent} finishes. What a run", "🏁 {agent} is home. Over to you"],
+    "waiting": ["🎙️ {agent} waits. Crowd holds", "⏱️ {agent} is waiting. Your serve", "👀 {agent} has a question!"],
+    "permission": ["🙋 {agent} needs your OK, ref", "🚩 {agent} stopped. Needs your OK", "🎙️ {agent} awaits your approval", "🔒 {agent} can't advance. OK it?"],
+    "handoff": ["🧩 {agent} passes to you!"],
+    "signin": ["🚪 {agent} needs you to sign in"],
+    "approval": ["🔐 {agent} asks for access, ref"],
+    "run-ok": ["🚀 {what} is in! What a finish", "🏅 {what} scores. Crowd erupts"],
+    "run-failed": ["💥 {what} fails. Heartbreak", "🟥 {what} is out. Red card"],
+    "pile": ["📚 {count} more. Replay time"]
+  },
+  "messages": {
+    "run-ok": [
+      "It took {took} and a clean exit. Absolutely sensational."
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. A cruel blow, but they'll be back. Check the replay."
+    ],
+    "pile": [
+      "The latest play: {title}. {message} Back to you in the booth."
+    ]
+  },
+  "buttons": {
+    "go": "👉 Take me courtside",
+    "go-done": "📺 Watch the replay",
+    "go-permission": "🚩 Review the call",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Review request",
+    "go-failed": "📺 Replay the failure",
+    "reply": "🎙️ Call it to {agent}",
+    "snooze": "⏱️ Timeout, 10 min"
+  },
+  "snoozed": "⏰ Back live: "
+}

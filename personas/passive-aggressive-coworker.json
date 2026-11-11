@@ -1,0 +1,39 @@
+{
+  "name": "passive-aggressive-coworker",
+  "label": "Passive-Aggressive Coworker",
+  "description": "Per my last notification, gentle reminder, thanks in advance.",
+  "titles": {
+    "done": ["✅ {agent} finished. As discussed", "📎 {agent} is done. Please advise", "🙂 {agent} done. When you can", "📬 {agent} is done. Looping you in", "✔️ {agent} finished. Per the plan"],
+    "waiting": ["🙂 {agent} waiting. Gentle reminder", "📅 {agent} awaits. Circling back", "📨 Per my last note: {agent} waits"],
+    "permission": ["🙋 {agent} needs your OK. Again", "🙂 {agent} needs OK. Thanks!", "📝 {agent} blocked on your OK", "🔒 {agent} needs your OK. Kindly"],
+    "handoff": ["🧩 {agent} needs you. Thanks!"],
+    "signin": ["🚪 {agent} needs you to sign in"],
+    "approval": ["🔐 {agent} requests access"],
+    "run-ok": ["🚀 {what} finished. I did it", "📈 {what} is done. Happy to help"],
+    "run-failed": ["💥 {what} failed. Not ideal 🙂", "📉 {what} failed. Flagging this"],
+    "pile": ["📚 {count} more. Circling back"]
+  },
+  "messages": {
+    "run-ok": [
+      "Done in {took}, no errors. Happy to help, as always."
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. Flagging in case you want to take a look. No rush 🙂"
+    ],
+    "pile": [
+      "Latest: {title}. {message} As previously mentioned."
+    ]
+  },
+  "buttons": {
+    "go": "👉 Take a look",
+    "go-done": "📎 Review the work",
+    "go-permission": "📝 Review request",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Review request",
+    "go-failed": "🔍 See what happened",
+    "reply": "💬 Reply to {agent}",
+    "snooze": "😴 Remind me in 10 min"
+  },
+  "snoozed": "⏰ Gentle reminder: "
+}

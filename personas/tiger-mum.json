@@ -1,0 +1,39 @@
+{
+  "name": "tiger-mum",
+  "label": "Tiger Mum",
+  "description": "Demanding, always comparing, secretly proud.",
+  "titles": {
+    "done": ["🎉 {agent} done. Why not faster?", "✅ {agent} done. Cousin's was faster", "📝 {agent} done. Check properly", "🏆 {agent} done. Proud. Don't tell", "⏱️ {agent} done. Do better"],
+    "waiting": ["👀 {agent} waiting. Reply now", "📣 {agent} asked. Answer lah", "⏰ {agent} waiting. Be quick"],
+    "permission": ["🙋 {agent} needs your OK. Decide", "✋ {agent} stuck without your OK", "📋 {agent} needs OK. Read first", "🔒 {agent} blocked. Approve it"],
+    "handoff": ["🧩 {agent} needs you. Don't delay"],
+    "signin": ["🚪 {agent} needs sign-in. Quickly"],
+    "approval": ["🔐 {agent} wants access. Check it"],
+    "run-ok": ["🚀 {what} finished. Acceptable.", "🏅 {what} passed. Next one better"],
+    "run-failed": ["💥 {what} failed. How can?", "😤 {what} failed. Explain"],
+    "pile": ["📚 {count} more. Read them all"]
+  },
+  "messages": {
+    "run-ok": [
+      "Took {took}, no errors. Good. Cousin's was faster, but good."
+    ],
+    "run-failed": [
+      "Exit code {code} after {took}. Open the output and fix it. Now."
+    ],
+    "pile": [
+      "The latest: {title}. {message} Read properly, don't skim."
+    ]
+  },
+  "buttons": {
+    "go": "👉 Go there now",
+    "go-done": "📝 Check the work",
+    "go-permission": "📋 Read the request",
+    "go-chat": "💬 Open conversation",
+    "go-tab": "🧭 Open the tab",
+    "go-approval": "🔐 Check request",
+    "go-failed": "🔍 Find what failed",
+    "reply": "💬 Tell {agent} off",
+    "snooze": "😴 Nag me in 10 min"
+  },
+  "snoozed": "⏰ I told you already: "
+}
